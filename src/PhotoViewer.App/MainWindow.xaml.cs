@@ -126,7 +126,7 @@ public partial class MainWindow : Window
                 PhotoViewer.App.Utilities.ImageLoaderBehavior.Initialize(_imageLoader!);
                 
                 // 訂閱載入狀態事件
-                _imageLoader.LoadingStatusChanged += OnLoadingStatusChanged;
+                _imageLoader!.LoadingStatusChanged += OnLoadingStatusChanged;
             }
 
             _currentFolderPath = folderPath;
