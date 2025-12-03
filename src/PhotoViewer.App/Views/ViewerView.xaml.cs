@@ -1,0 +1,259 @@
+using System.IO;
+using System.Windows;
+using System.Windows.Input;
+using PhotoViewer.Core.Models;
+using PhotoViewer.Core.Services;
+using PhotoViewer.Core.Utilities;
+
+namespace PhotoViewer.App.Views;
+
+/// <summary>
+/// 單張圖片檢視視窗
+/// </summary>
+public partial class ViewerView : Window
+{
+    private readonly ImageLoaderService _imageLoader;
+    private List<ImageItem> _images = new();
+    private int _currentIndex;
+    private bool _isLoading = false;
+
+    public ViewerView(List<ImageItem> images, int startIndex = 0)
+    {
+        InitializeComponent();
+
+        _imageLoader = new ImageLoaderService();
+        _images = images;
+        _currentIndex = startIndex;
+
+        // 視窗載入完成後再載入圖片
+        Loaded += (s, e) =>
+        {
+            // 短暫延遲確保視窗完全顯示
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                LoadCurrentImage();
+                // 載入後取消 Topmost，避免一直在最上層
+                Topmost = false;
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        };
+    }
+
+    /// <summary>
+    /// 載入目前圖片
+    /// </summary>
+    private async void LoadCurrentImage()
+    {
+        if (_isLoading)
+            return;
+
+        if (_currentIndex < 0 || _currentIndex >= _images.Count)
+            return;
+
+        _isLoading = true;
+        var currentImage = _images[_currentIndex];
+
+        try
+        {
+            // 顯示載入指示器
+            LoadingPanel.Visibility = Visibility.Visible;
+            UpdateUI(currentImage);
+
+            // 載入完整圖片
+            var bitmap = await _imageLoader.LoadFullImageAsync(currentImage.FilePath);
+
+            if (bitmap != null)
+            {
+                // 更新圖片尺寸資訊
+                if (currentImage.Dimensions.Width == 0)
+                {
+                    currentImage.Dimensions = (bitmap.Width, bitmap.Height);
+                    UpdateUI(currentImage);
+                }
+
+                ImageCanvas.CurrentBitmap = bitmap;
+
+                // 短暫延遲確保 bitmap 已設定到視覺樹
+                await Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    // 確保圖片置中並適應視窗
+                    ImageCanvas.FitToWindow();
+                    UpdateZoomDisplay();
+                }), System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+            else
+            {
+                MessageBox.Show($"無法載入圖片: {currentImage.FileName}", "錯誤", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"載入圖片時發生錯誤: {ex.Message}", "錯誤", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            LoadingPanel.Visibility = Visibility.Collapsed;
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// 更新 UI 資訊
+    /// </summary>
+    private void UpdateUI(ImageItem image)
+    {
+        FileNameTextBlock.Text = image.FileName;
+        PositionTextBlock.Text = $"{_currentIndex + 1} / {_images.Count}";
+
+        var sizeInfo = image.Dimensions.Width > 0
+            ? $"{image.Dimensions.Width} × {image.Dimensions.Height}"
+            : "";
+
+        ImageInfoTextBlock.Text = $"{image.Format} | {ImageUtils.FormatFileSize(image.FileSize)} | {sizeInfo}";
+
+        // 更新按鈕狀態
+        PreviousButton.IsEnabled = _currentIndex > 0;
+        NextButton.IsEnabled = _currentIndex < _images.Count - 1;
+    }
+
+    /// <summary>
+    /// 更新縮放顯示
+    /// </summary>
+    private void UpdateZoomDisplay()
+    {
+        var zoomPercent = (int)(ImageCanvas.Scale * 100);
+        ZoomTextBlock.Text = $"{zoomPercent}%";
+    }
+
+    /// <summary>
+    /// 上一張
+    /// </summary>
+    private void PreviousButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentIndex > 0)
+        {
+            _currentIndex--;
+            LoadCurrentImage();
+        }
+    }
+
+    /// <summary>
+    /// 下一張
+    /// </summary>
+    private void NextButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentIndex < _images.Count - 1)
+        {
+            _currentIndex++;
+            LoadCurrentImage();
+        }
+    }
+
+    /// <summary>
+    /// 適應視窗
+    /// </summary>
+    private void FitButton_Click(object sender, RoutedEventArgs e)
+    {
+        ImageCanvas.FitToWindow();
+        UpdateZoomDisplay();
+    }
+
+    /// <summary>
+    /// 實際大小
+    /// </summary>
+    private void ActualSizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        ImageCanvas.ActualSize();
+        UpdateZoomDisplay();
+    }
+
+    /// <summary>
+    /// 左轉 90 度
+    /// </summary>
+    private void RotateLeftButton_Click(object sender, RoutedEventArgs e)
+    {
+        ImageCanvas.Rotate(-90);
+    }
+
+    /// <summary>
+    /// 右轉 90 度
+    /// </summary>
+    private void RotateRightButton_Click(object sender, RoutedEventArgs e)
+    {
+        ImageCanvas.Rotate(90);
+    }
+
+    /// <summary>
+    /// 鍵盤快捷鍵
+    /// </summary>
+    private void Window_KeyDown(object sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Left:
+            case Key.PageUp:
+                if (_currentIndex > 0)
+                {
+                    _currentIndex--;
+                    LoadCurrentImage();
+                }
+                e.Handled = true;
+                break;
+
+            case Key.Right:
+            case Key.PageDown:
+                if (_currentIndex < _images.Count - 1)
+                {
+                    _currentIndex++;
+                    LoadCurrentImage();
+                }
+                e.Handled = true;
+                break;
+
+            case Key.Home:
+                _currentIndex = 0;
+                LoadCurrentImage();
+                e.Handled = true;
+                break;
+
+            case Key.End:
+                _currentIndex = _images.Count - 1;
+                LoadCurrentImage();
+                e.Handled = true;
+                break;
+
+            case Key.F:
+                ImageCanvas.FitToWindow();
+                UpdateZoomDisplay();
+                e.Handled = true;
+                break;
+
+            case Key.D1 when Keyboard.Modifiers == ModifierKeys.Control:
+                ImageCanvas.ActualSize();
+                UpdateZoomDisplay();
+                e.Handled = true;
+                break;
+
+            case Key.R when Keyboard.Modifiers == ModifierKeys.Shift:
+                ImageCanvas.Rotate(-90);
+                e.Handled = true;
+                break;
+
+            case Key.R:
+                ImageCanvas.Rotate(90);
+                e.Handled = true;
+                break;
+
+            case Key.Escape:
+                Close();
+                e.Handled = true;
+                break;
+        }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        base.OnClosed(e);
+        ImageCanvas.CurrentBitmap = null;
+        _imageLoader?.Dispose();
+    }
+}
