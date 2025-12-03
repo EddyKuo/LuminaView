@@ -236,3 +236,5 @@ orleans.codegen.cs
 # LuminaView specific
 *.lock
 .gemini/
+
+build_log.txt

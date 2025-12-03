@@ -4,6 +4,9 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PhotoViewer.App"
+        xmlns:util="clr-namespace:PhotoViewer.App.Utilities"
+        xmlns:controls="clr-namespace:PhotoViewer.App.Controls"
+        xmlns:models="clr-namespace:PhotoViewer.Core.Models;assembly=PhotoViewer.Core"
         mc:Ignorable="d"
         Title="LuminaView - 圖片瀏覽器"
         Height="768"
@@ -52,20 +55,31 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- 左側檔案夾樹（未來實作） -->
+            <!-- Left Sidebar (Folder Tree) -->
             <Border Grid.Column="0" Background="#FF252526" BorderBrush="#FF555555" BorderThickness="0,0,1,0">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="10">
-                        <TextBlock Text="檔案夾樹"
-                                  Foreground="#FFCCCCCC"
-                                  FontSize="14"
-                                  FontWeight="Bold"
-                                  Margin="0,0,0,10"/>
-                        <TextBlock Text="（待實作）"
-                                  Foreground="#FF666666"
-                                  FontSize="12"/>
-                    </StackPanel>
-                </ScrollViewer>
+                <TreeView x:Name="FolderTreeView" 
+                          ItemsSource="{Binding Folders}" 
+                          Background="Transparent" 
+                          BorderThickness="0"
+                          SelectedItemChanged="FolderTreeView_SelectedItemChanged">
+                    <TreeView.ItemContainerStyle>
+                        <Style TargetType="{x:Type TreeViewItem}">
+                            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                            <Setter Property="Foreground" Value="#CCCCCC"/>
+                            <Setter Property="FontSize" Value="13"/>
+                            <Setter Property="Padding" Value="2,4"/>
+                        </Style>
+                    </TreeView.ItemContainerStyle>
+                    <TreeView.ItemTemplate>
+                        <HierarchicalDataTemplate DataType="{x:Type models:FolderNode}" ItemsSource="{Binding Children}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📁" Margin="0,0,5,0" Foreground="#FFD700"/>
+                                <TextBlock Text="{Binding Name}" />
+                            </StackPanel>
+                        </HierarchicalDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
             </Border>
 
             <!-- 分隔條 -->
@@ -79,23 +93,82 @@
             <!-- 右側圖片網格區域 -->
             <Border Grid.Column="2" Background="#FF1E1E1E">
                 <Grid>
-                    <!-- 圖片網格 -->
-                    <ScrollViewer x:Name="ImageScrollViewer"
-                                 VerticalScrollBarVisibility="Auto"
-                                 HorizontalScrollBarVisibility="Disabled"
-                                 Background="Transparent">
-                        <WrapPanel x:Name="ImageWrapPanel"
-                                  Margin="10"
-                                  Orientation="Horizontal"
-                                  ItemWidth="160"
-                                  ItemHeight="160"/>
-                    </ScrollViewer>
+                    <!-- 圖片列表 (虛擬化) -->
+                    <ListBox x:Name="ImageListBox"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             VirtualizingPanel.IsVirtualizing="True"
+                             VirtualizingPanel.VirtualizationMode="Recycling"
+                             ScrollViewer.CanContentScroll="True"
+                             Padding="10">
+                        
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <controls:VirtualizingWrapPanel ItemWidth="160" ItemHeight="160"/>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <ContentPresenter />
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Width="150" Height="150" Margin="5"
+                                        Background="#FF2D2D30"
+                                        BorderBrush="#FF555555"
+                                        BorderThickness="1"
+                                        CornerRadius="3"
+                                        Cursor="Hand"
+                                        MouseLeftButtonDown="Thumbnail_MouseLeftButtonDown">
+                                    <Grid>
+                                        <TextBlock Text="載入中..."
+                                                  Foreground="Gray"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  FontSize="11"/>
+                                        
+                                        <Image Stretch="Uniform" Margin="5"
+                                               util:ImageLoaderBehavior.ImagePath="{Binding FilePath}"/>
+                                        
+                                        <TextBlock Text="{Binding FileName}"
+                                                  Foreground="#FFCCCCCC"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Bottom"
+                                                  Margin="5"
+                                                  FontSize="10"
+                                                  TextTrimming="CharacterEllipsis"
+                                                  MaxWidth="140">
+                                            <TextBlock.Effect>
+                                                <DropShadowEffect ShadowDepth="1" BlurRadius="2"/>
+                                            </TextBlock.Effect>
+                                        </TextBlock>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
 
                     <!-- 無圖片提示 -->
                     <StackPanel x:Name="EmptyStatePanel"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
-                               Visibility="Visible">
+                               Visibility="Visible"
+                               IsHitTestVisible="False">
                         <TextBlock Text="📷"
                                   FontSize="72"
                                   HorizontalAlignment="Center"
@@ -113,11 +186,20 @@
         <!-- 底部狀態列 -->
         <Border Grid.Row="2" Background="#FF007ACC" BorderBrush="#FF555555" BorderThickness="0,1,0,0" Padding="10,6">
             <Grid>
-                <TextBlock x:Name="StatusTextBlock"
-                          Text="就緒"
-                          VerticalAlignment="Center"
-                          Foreground="White"
-                          FontSize="12"/>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="StatusTextBlock"
+                              Text="就緒"
+                              Foreground="White"
+                              FontSize="12"
+                              Margin="0,0,10,0"/>
+                    
+                    <ProgressBar x:Name="LoadingProgressBar"
+                                Width="100"
+                                Height="12"
+                                Visibility="Collapsed"
+                                IsIndeterminate="False"
+                                Maximum="100"/>
+                </StackPanel>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <TextBlock x:Name="MemoryUsageTextBlock"

@@ -156,18 +156,15 @@ public class SkiaCanvasControl : SKElement
     /// <summary>
     /// 計算置中位置
     /// </summary>
+    /// <summary>
+    /// 計算置中位置 (返回 Canvas 中心點)
+    /// </summary>
     private SKPoint CalculateCenterPosition()
     {
-        if (_currentBitmap == null || ActualWidth == 0 || ActualHeight == 0)
+        if (ActualWidth == 0 || ActualHeight == 0)
             return SKPoint.Empty;
 
-        var scaledWidth = _currentBitmap.Width * _scale;
-        var scaledHeight = _currentBitmap.Height * _scale;
-
-        var x = ((float)ActualWidth - scaledWidth) / 2;
-        var y = ((float)ActualHeight - scaledHeight) / 2;
-
-        return new SKPoint(x, y);
+        return new SKPoint((float)ActualWidth / 2f, (float)ActualHeight / 2f);
     }
 
     /// <summary>
@@ -178,26 +175,27 @@ public class SkiaCanvasControl : SKElement
         if (_currentBitmap == null)
             return;
 
+        var imageCenterX = _currentBitmap.Width / 2f;
+        var imageCenterY = _currentBitmap.Height / 2f;
+
         _matrix = SKMatrix.Identity;
 
-        // 先平移到目標位置
-        _matrix = _matrix.PostConcat(SKMatrix.CreateTranslation(_translate.X, _translate.Y));
+        // 1. 移到圖片中心 (原點)
+        _matrix = _matrix.PostConcat(SKMatrix.CreateTranslation(-imageCenterX, -imageCenterY));
 
-        // 縮放
+        // 2. 縮放
         _matrix = _matrix.PostConcat(SKMatrix.CreateScale(_scale, _scale));
 
-        // 旋轉（以圖片中心為軸）
+        // 3. 旋轉
         if (_rotation != 0)
         {
-            var centerX = _currentBitmap.Width * _scale / 2f;
-            var centerY = _currentBitmap.Height * _scale / 2f;
-            _matrix = _matrix.PostConcat(SKMatrix.CreateRotationDegrees(_rotation, _translate.X + centerX, _translate.Y + centerY));
+            _matrix = _matrix.PostConcat(SKMatrix.CreateRotationDegrees(_rotation));
         }
+
+        // 4. 移到目標位置 (_translate 現在是 Canvas 上的中心點)
+        _matrix = _matrix.PostConcat(SKMatrix.CreateTranslation(_translate.X, _translate.Y));
     }
 
-    /// <summary>
-    /// 滑鼠滾輪縮放
-    /// </summary>
     private void OnMouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (_currentBitmap == null)
@@ -206,16 +204,12 @@ public class SkiaCanvasControl : SKElement
         var zoomFactor = e.Delta > 0 ? 1.1f : 0.9f;
         var newScale = _scale * zoomFactor;
 
-        // 以滑鼠位置為中心縮放
         var mousePos = e.GetPosition(this);
         ZoomAtPoint(newScale, (float)mousePos.X, (float)mousePos.Y);
 
         e.Handled = true;
     }
 
-    /// <summary>
-    /// 在指定點縮放
-    /// </summary>
     private void ZoomAtPoint(float newScale, float x, float y)
     {
         newScale = Math.Clamp(newScale, 0.1f, 10f);
@@ -223,15 +217,24 @@ public class SkiaCanvasControl : SKElement
         if (_currentBitmap == null)
             return;
 
-        // 計算縮放前後的差異，調整平移以保持滑鼠位置不變
-        var scaleDiff = newScale / _scale;
-        _translate.X = x - (x - _translate.X) * scaleDiff;
-        _translate.Y = y - (y - _translate.Y) * scaleDiff;
+        // 計算縮放前後的差異，調整中心點位置以保持滑鼠下的點不動
+        // 原理：(Mouse - Translate) / OldScale = (Mouse - NewTranslate) / NewScale
+        // NewTranslate = Mouse - (Mouse - OldTranslate) * (NewScale / OldScale)
+        
+        var scaleRatio = newScale / _scale;
+        
+        _translate.X = x - (x - _translate.X) * scaleRatio;
+        _translate.Y = y - (y - _translate.Y) * scaleRatio;
 
         _scale = newScale;
         UpdateMatrix();
         InvalidateVisual();
     }
+
+    /// <summary>
+    /// 滑鼠滾輪縮放
+    /// </summary>
+
 
     /// <summary>
     /// 滑鼠左鍵按下（開始拖拽）

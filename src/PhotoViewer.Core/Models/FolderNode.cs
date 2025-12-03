@@ -1,47 +1,111 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO;
+using System.Runtime.CompilerServices;
+
 namespace PhotoViewer.Core.Models;
 
-/// <summary>
-/// 檔案夾樹結構節點
-/// </summary>
-public class FolderNode
+public class FolderNode : INotifyPropertyChanged
 {
-    /// <summary>
-    /// 檔案夾完整路徑
-    /// </summary>
-    public string Path { get; set; } = string.Empty;
+    private bool _isExpanded;
+    private bool _isSelected;
 
-    /// <summary>
-    /// 檔案夾名稱（不含路徑）
-    /// </summary>
     public string Name { get; set; } = string.Empty;
+    public string FullPath { get; set; } = string.Empty;
+    public ObservableCollection<FolderNode> Children { get; set; } = new();
 
-    /// <summary>
-    /// 子檔案夾列表
-    /// </summary>
-    public List<FolderNode> SubFolders { get; set; } = new();
+    // 用於延遲加載的標記項目
+    private static readonly FolderNode DummyNode = new FolderNode { Name = "Loading..." };
 
-    /// <summary>
-    /// 檔案夾內的圖片列表
-    /// </summary>
-    public List<ImageItem> Images { get; set; } = new();
+    public bool HasDummyNode => Children.Count == 1 && Children[0] == DummyNode;
 
-    /// <summary>
-    /// 最後掃描時間
-    /// </summary>
-    public DateTime LastScanned { get; set; }
+    public FolderNode()
+    {
+    }
 
-    /// <summary>
-    /// 圖片總數（包含子檔案夾）
-    /// </summary>
-    public int TotalImageCount { get; set; }
+    public FolderNode(string path)
+    {
+        FullPath = path;
+        Name = Path.GetFileName(path);
+        if (string.IsNullOrEmpty(Name)) // 處理磁碟機根目錄 (e.g., "C:\")
+        {
+            Name = path;
+        }
+    }
 
-    /// <summary>
-    /// 是否已展開（用於 UI 樹狀顯示）
-    /// </summary>
-    public bool IsExpanded { get; set; }
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set
+        {
+            if (_isExpanded != value)
+            {
+                _isExpanded = value;
+                OnPropertyChanged();
+                
+                if (_isExpanded && HasDummyNode)
+                {
+                    LoadChildren();
+                }
+            }
+        }
+    }
 
-    /// <summary>
-    /// 父節點引用
-    /// </summary>
-    public FolderNode? Parent { get; set; }
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public void AddDummyNode()
+    {
+        Children.Clear();
+        Children.Add(DummyNode);
+    }
+
+    private void LoadChildren()
+    {
+        Children.Clear();
+        try
+        {
+            var directories = Directory.GetDirectories(FullPath);
+            foreach (var dir in directories)
+            {
+                var node = new FolderNode(dir);
+                // 檢查是否有子目錄，若有則添加 dummy node 以支援延遲加載
+                try 
+                {
+                    if (Directory.EnumerateDirectories(dir).Any())
+                    {
+                        node.AddDummyNode();
+                    }
+                }
+                catch (UnauthorizedAccessException) { } // 忽略無權限的目錄
+                
+                Children.Add(node);
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // 忽略無權限的目錄
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading children for {FullPath}: {ex.Message}");
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 }

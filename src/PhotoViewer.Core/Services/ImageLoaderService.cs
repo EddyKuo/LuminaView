@@ -14,6 +14,10 @@ public class ImageLoaderService : IDisposable
     private readonly ImageDecoderService _decoderService;
     private readonly LruCache<string, SKBitmap> _memoryCache;
     private readonly SemaphoreSlim _loadingSemaphore;
+    private int _activeLoadCount;
+
+    public event EventHandler<int>? LoadingStatusChanged;
+    public int ActiveLoadCount => _activeLoadCount;
 
     /// <summary>
     /// 建構子
@@ -44,14 +48,17 @@ public class ImageLoaderService : IDisposable
         // 檢查記憶體快取
         if (_memoryCache.TryGet(filePath, out var cachedBitmap))
         {
-            Console.WriteLine($"[LoadThumbnail] Memory cache HIT: {Path.GetFileName(filePath)}");
+            // Console.WriteLine($"[LoadThumbnail] Memory cache HIT: {Path.GetFileName(filePath)}");
             return cachedBitmap;
         }
 
-        Console.WriteLine($"[LoadThumbnail] Memory cache MISS: {Path.GetFileName(filePath)}");
+        // Console.WriteLine($"[LoadThumbnail] Memory cache MISS: {Path.GetFileName(filePath)}");
 
         // 控制並發數量
         await _loadingSemaphore.WaitAsync(ct);
+        
+        Interlocked.Increment(ref _activeLoadCount);
+        LoadingStatusChanged?.Invoke(this, _activeLoadCount);
 
         try
         {
@@ -84,6 +91,8 @@ public class ImageLoaderService : IDisposable
         }
         finally
         {
+            Interlocked.Decrement(ref _activeLoadCount);
+            LoadingStatusChanged?.Invoke(this, _activeLoadCount);
             _loadingSemaphore.Release();
         }
     }
