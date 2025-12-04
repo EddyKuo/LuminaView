@@ -1,4 +1,5 @@
 using SQLite;
+using System.IO;
 using PhotoViewer.Core.Models;
 using PhotoViewer.Core.Utilities;
 

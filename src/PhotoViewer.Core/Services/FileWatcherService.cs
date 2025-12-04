@@ -1,5 +1,7 @@
 namespace PhotoViewer.Core.Services;
 
+using System.IO;
+
 /// <summary>
 /// 檔案系統監控服務
 /// 監控檔案夾變化，觸發事件通知

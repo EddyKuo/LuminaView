@@ -55,4 +55,9 @@ public class ImageItem
     /// 建立時間
     /// </summary>
     public DateTime Created { get; set; }
+
+    /// <summary>
+    /// EXIF 資訊
+    /// </summary>
+    public Dictionary<string, string> ExifData { get; set; } = new();
 }

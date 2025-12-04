@@ -34,11 +34,15 @@ public class SkiaCanvasControl : SKElement
     /// <summary>
     /// 目前顯示的圖片
     /// </summary>
+    /// <summary>
+    /// 目前顯示的圖片
+    /// </summary>
     public SKBitmap? CurrentBitmap
     {
         get => _currentBitmap;
         set
         {
+            StopAnimation();
             _currentBitmap = value;
             if (value != null)
             {
@@ -46,6 +50,74 @@ public class SkiaCanvasControl : SKElement
             }
             InvalidateVisual();
         }
+    }
+
+    private PhotoViewer.Core.Models.AnimatedImage? _animatedImage;
+    private System.Windows.Threading.DispatcherTimer? _animationTimer;
+    private int _currentFrameIndex;
+
+    /// <summary>
+    /// 設定動畫圖片
+    /// </summary>
+    public void SetAnimatedImage(PhotoViewer.Core.Models.AnimatedImage? animatedImage)
+    {
+        StopAnimation();
+        _animatedImage = animatedImage;
+
+        if (_animatedImage != null && _animatedImage.FrameCount > 0)
+        {
+            _currentBitmap = _animatedImage.Frames[0];
+            ResetTransform();
+            StartAnimation();
+        }
+        else
+        {
+            _currentBitmap = null;
+            InvalidateVisual();
+        }
+    }
+
+    private void StartAnimation()
+    {
+        if (_animatedImage == null || _animatedImage.FrameCount <= 1)
+            return;
+
+        _currentFrameIndex = 0;
+        _animationTimer = new System.Windows.Threading.DispatcherTimer();
+        _animationTimer.Tick += OnAnimationTick;
+        _animationTimer.Interval = TimeSpan.FromMilliseconds(_animatedImage.Durations[0]);
+        _animationTimer.Start();
+    }
+
+    private void StopAnimation()
+    {
+        if (_animationTimer != null)
+        {
+            _animationTimer.Stop();
+            _animationTimer.Tick -= OnAnimationTick;
+            _animationTimer = null;
+        }
+        _animatedImage = null;
+    }
+
+    private void OnAnimationTick(object? sender, EventArgs e)
+    {
+        if (_animatedImage == null)
+        {
+            StopAnimation();
+            return;
+        }
+
+        _currentFrameIndex = (_currentFrameIndex + 1) % _animatedImage.FrameCount;
+        _currentBitmap = _animatedImage.Frames[_currentFrameIndex];
+        
+        // 更新下一幀的間隔
+        if (_animationTimer != null)
+        {
+            _animationTimer.Interval = TimeSpan.FromMilliseconds(_animatedImage.Durations[_currentFrameIndex]);
+        }
+
+        InvalidateVisual();
     }
 
     /// <summary>

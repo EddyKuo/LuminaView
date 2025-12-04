@@ -58,32 +58,58 @@ public partial class ViewerView : Window
             LoadingPanel.Visibility = Visibility.Visible;
             UpdateUI(currentImage);
 
-            // 載入完整圖片
-            var bitmap = await _imageLoader.LoadFullImageAsync(currentImage.FilePath);
-
-            if (bitmap != null)
+            // 嘗試載入動畫 (GIF)
+            var animatedImage = await _imageLoader.LoadAnimatedImageAsync(currentImage.FilePath);
+            
+            if (animatedImage != null)
             {
+                // 是動畫圖片
+                ImageCanvas.SetAnimatedImage(animatedImage);
+                
                 // 更新圖片尺寸資訊
                 if (currentImage.Dimensions.Width == 0)
                 {
-                    currentImage.Dimensions = (bitmap.Width, bitmap.Height);
+                    currentImage.Dimensions = (animatedImage.Width, animatedImage.Height);
                     UpdateUI(currentImage);
                 }
-
-                ImageCanvas.CurrentBitmap = bitmap;
-
-                // 短暫延遲確保 bitmap 已設定到視覺樹
-                await Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    // 確保圖片置中並適應視窗
-                    ImageCanvas.FitToWindow();
-                    UpdateZoomDisplay();
-                }), System.Windows.Threading.DispatcherPriority.Loaded);
             }
             else
             {
-                MessageBox.Show($"無法載入圖片: {currentImage.FileName}", "錯誤", MessageBoxButton.OK, MessageBoxImage.Error);
+                // 不是動畫或載入失敗，嘗試載入一般靜態圖片
+                var bitmap = await _imageLoader.LoadFullImageAsync(currentImage.FilePath);
+
+                if (bitmap != null)
+                {
+                    // 更新圖片尺寸資訊
+                    if (currentImage.Dimensions.Width == 0)
+                    {
+                        currentImage.Dimensions = (bitmap.Width, bitmap.Height);
+                        UpdateUI(currentImage);
+                    }
+
+                    ImageCanvas.CurrentBitmap = bitmap;
+                }
+                else
+                {
+                    MessageBox.Show($"無法載入圖片: {currentImage.FileName}", "錯誤", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
             }
+
+            // 載入 EXIF 資訊
+            if (currentImage.ExifData.Count == 0)
+            {
+                currentImage.ExifData = await _imageLoader.GetExifDataAsync(currentImage.FilePath);
+            }
+            ExifListView.ItemsSource = currentImage.ExifData;
+
+            // 短暫延遲確保 bitmap 已設定到視覺樹
+            await Dispatcher.BeginInvoke(new Action(() =>
+            {
+                // 確保圖片置中並適應視窗
+                ImageCanvas.FitToWindow();
+                UpdateZoomDisplay();
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
         catch (Exception ex)
         {
@@ -183,6 +209,90 @@ public partial class ViewerView : Window
     }
 
     /// <summary>
+    /// 顯示/隱藏資訊面板
+    /// </summary>
+    private void InfoButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleInfoPanel();
+    }
+
+    private void ToggleInfoPanel()
+    {
+        if (InfoPanel.Visibility == Visibility.Visible)
+        {
+            InfoPanel.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            InfoPanel.Visibility = Visibility.Visible;
+        }
+    }
+
+    // 幻燈片播放相關
+    private System.Windows.Threading.DispatcherTimer? _slideshowTimer;
+    private bool _isSlideshowPlaying = false;
+
+    private void SlideshowButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleSlideshow();
+    }
+
+    private void ToggleSlideshow()
+    {
+        if (_isSlideshowPlaying)
+        {
+            StopSlideshow();
+        }
+        else
+        {
+            StartSlideshow();
+        }
+    }
+
+    private void StartSlideshow()
+    {
+        if (_isSlideshowPlaying) return;
+
+        _isSlideshowPlaying = true;
+        SlideshowButton.Content = "⏹ 停止";
+        
+        _slideshowTimer = new System.Windows.Threading.DispatcherTimer();
+        _slideshowTimer.Interval = TimeSpan.FromSeconds(3); // 預設 3 秒
+        _slideshowTimer.Tick += OnSlideshowTick;
+        _slideshowTimer.Start();
+    }
+
+    private void StopSlideshow()
+    {
+        if (!_isSlideshowPlaying) return;
+
+        _isSlideshowPlaying = false;
+        SlideshowButton.Content = "▶ 播放";
+        
+        if (_slideshowTimer != null)
+        {
+            _slideshowTimer.Stop();
+            _slideshowTimer.Tick -= OnSlideshowTick;
+            _slideshowTimer = null;
+        }
+    }
+
+    private void OnSlideshowTick(object? sender, EventArgs e)
+    {
+        if (_currentIndex < _images.Count - 1)
+        {
+            _currentIndex++;
+            LoadCurrentImage();
+        }
+        else
+        {
+            // 播放到底後循環回到第一張
+            _currentIndex = 0;
+            LoadCurrentImage();
+        }
+    }
+
+    /// <summary>
     /// 鍵盤快捷鍵
     /// </summary>
     private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -243,8 +353,25 @@ public partial class ViewerView : Window
                 e.Handled = true;
                 break;
 
+            case Key.I:
+                ToggleInfoPanel();
+                e.Handled = true;
+                break;
+
+            case Key.F5:
+                ToggleSlideshow();
+                e.Handled = true;
+                break;
+
             case Key.Escape:
-                Close();
+                if (_isSlideshowPlaying)
+                {
+                    StopSlideshow();
+                }
+                else
+                {
+                    Close();
+                }
                 e.Handled = true;
                 break;
         }
@@ -252,6 +379,7 @@ public partial class ViewerView : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        StopSlideshow();
         base.OnClosed(e);
         ImageCanvas.CurrentBitmap = null;
         _imageLoader?.Dispose();

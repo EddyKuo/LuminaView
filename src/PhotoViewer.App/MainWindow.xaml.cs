@@ -18,6 +18,7 @@ public partial class MainWindow : Window
 {
     private ImageLoaderService? _imageLoader;
     private readonly FileWatcherService _fileWatcher;
+    private readonly Services.ThemeService _themeService;
     private List<ImageItem> _currentImages = new();
     private string _currentFolderPath = string.Empty;
 
@@ -34,6 +35,7 @@ public partial class MainWindow : Window
             // 延遲初始化 ImageLoader，避免在啟動時就創建資料庫
             // _imageLoader = new ImageLoaderService();
             _fileWatcher = new FileWatcherService();
+            _themeService = new Services.ThemeService();
 
             // 訂閱檔案監控事件
             _fileWatcher.FileCreated += OnFileCreated;
@@ -103,6 +105,11 @@ public partial class MainWindow : Window
         {
             await LoadFolderAsync(dialog.FolderName);
         }
+    }
+
+    private void ThemeButton_Click(object sender, RoutedEventArgs e)
+    {
+        _themeService.ToggleTheme();
     }
 
     /// <summary>
@@ -220,15 +227,21 @@ public partial class MainWindow : Window
     /// <summary>
     /// 縮圖點擊事件
     /// </summary>
+    /// <summary>
+    /// 縮圖點擊事件
+    /// </summary>
     private void Thumbnail_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        if (sender is FrameworkElement element && element.DataContext is ImageItem clickedImage)
+        if (e.ClickCount == 2)
         {
-            var index = _currentImages.IndexOf(clickedImage);
-            if (index >= 0)
+            if (sender is FrameworkElement element && element.DataContext is ImageItem clickedImage)
             {
-                var viewerWindow = new ViewerView(_currentImages, index);
-                viewerWindow.Show();
+                var index = _currentImages.IndexOf(clickedImage);
+                if (index >= 0)
+                {
+                    var viewerWindow = new ViewerView(_currentImages, index);
+                    viewerWindow.Show();
+                }
             }
         }
     }

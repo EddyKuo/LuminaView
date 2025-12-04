@@ -12,7 +12,7 @@
         Height="768"
         Width="1280"
         WindowState="Maximized"
-        Background="#FF2D2D30">
+        Background="{DynamicResource WindowBackgroundBrush}">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -22,7 +22,7 @@
         </Grid.RowDefinitions>
 
         <!-- 頂部工具列 -->
-        <Border Grid.Row="0" Background="#FF3E3E42" BorderBrush="#FF555555" BorderThickness="0,0,0,1" Padding="10,8">
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="10,8">
             <StackPanel Orientation="Horizontal">
                 <Button x:Name="OpenFolderButton"
                         Content="📂 開啟檔案夾"
@@ -41,9 +41,17 @@
                 <TextBlock x:Name="ImageCountTextBlock"
                           Text=""
                           VerticalAlignment="Center"
-                          Foreground="#FF999999"
+                          Foreground="{DynamicResource SecondaryTextBrush}"
                           FontSize="12"
                           Margin="20,0,0,0"/>
+
+                <Button x:Name="ThemeButton"
+                        Content="🌓"
+                        Padding="10,5"
+                        Margin="20,0,0,0"
+                        Click="ThemeButton_Click"
+                        Style="{StaticResource ModernButtonStyle}"
+                        ToolTip="切換主題"/>
             </StackPanel>
         </Border>
 
@@ -56,7 +64,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- Left Sidebar (Folder Tree) -->
-            <Border Grid.Column="0" Background="#FF252526" BorderBrush="#FF555555" BorderThickness="0,0,1,0">
+            <Border Grid.Column="0" Background="{DynamicResource SurfaceBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
                 <TreeView x:Name="FolderTreeView" 
                           ItemsSource="{Binding Folders}" 
                           Background="Transparent" 
@@ -66,7 +74,7 @@
                         <Style TargetType="{x:Type TreeViewItem}">
                             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
                             <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
-                            <Setter Property="Foreground" Value="#CCCCCC"/>
+                            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
                             <Setter Property="FontSize" Value="13"/>
                             <Setter Property="Padding" Value="2,4"/>
                         </Style>
@@ -87,11 +95,11 @@
                          Width="5"
                          HorizontalAlignment="Center"
                          VerticalAlignment="Stretch"
-                         Background="#FF3E3E42"
+                         Background="{DynamicResource BorderBrush}"
                          ShowsPreview="True"/>
 
             <!-- 右側圖片網格區域 -->
-            <Border Grid.Column="2" Background="#FF1E1E1E">
+            <Border Grid.Column="2" Background="{DynamicResource WindowBackgroundBrush}">
                 <Grid>
                     <!-- 圖片列表 (虛擬化) -->
                     <ListBox x:Name="ImageListBox"
@@ -129,12 +137,32 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Width="150" Height="150" Margin="5"
-                                        Background="#FF2D2D30"
-                                        BorderBrush="#FF555555"
+                                        Background="{DynamicResource SurfaceBackgroundBrush}"
+                                        BorderBrush="{DynamicResource BorderBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="3"
+                                        CornerRadius="4"
                                         Cursor="Hand"
                                         MouseLeftButtonDown="Thumbnail_MouseLeftButtonDown">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Effect">
+                                                <Setter.Value>
+                                                    <DropShadowEffect ShadowDepth="2" BlurRadius="5" Opacity="0.3"/>
+                                                </Setter.Value>
+                                            </Setter>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                    <Setter Property="Effect">
+                                                        <Setter.Value>
+                                                            <DropShadowEffect ShadowDepth="4" BlurRadius="10" Opacity="0.5"/>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
                                     <Grid>
                                         <TextBlock Text="載入中..."
                                                   Foreground="Gray"
@@ -145,18 +173,15 @@
                                         <Image Stretch="Uniform" Margin="5"
                                                util:ImageLoaderBehavior.ImagePath="{Binding FilePath}"/>
                                         
-                                        <TextBlock Text="{Binding FileName}"
-                                                  Foreground="#FFCCCCCC"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Bottom"
-                                                  Margin="5"
-                                                  FontSize="10"
-                                                  TextTrimming="CharacterEllipsis"
-                                                  MaxWidth="140">
-                                            <TextBlock.Effect>
-                                                <DropShadowEffect ShadowDepth="1" BlurRadius="2"/>
-                                            </TextBlock.Effect>
-                                        </TextBlock>
+                                        <Border VerticalAlignment="Bottom" Background="#99000000" CornerRadius="0,0,3,3">
+                                            <TextBlock Text="{Binding FileName}"
+                                                      Foreground="{DynamicResource PrimaryTextBrush}"
+                                                      HorizontalAlignment="Center"
+                                                      Margin="5,3"
+                                                      FontSize="11"
+                                                      TextTrimming="CharacterEllipsis"
+                                                      MaxWidth="140"/>
+                                        </Border>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -172,10 +197,10 @@
                         <TextBlock Text="📷"
                                   FontSize="72"
                                   HorizontalAlignment="Center"
-                                  Foreground="#FF555555"/>
+                                  Foreground="{DynamicResource SecondaryTextBrush}"/>
                         <TextBlock Text="請點擊「開啟檔案夾」選擇包含圖片的檔案夾"
                                   FontSize="16"
-                                  Foreground="#FF888888"
+                                  Foreground="{DynamicResource SecondaryTextBrush}"
                                   HorizontalAlignment="Center"
                                   Margin="0,20,0,0"/>
                     </StackPanel>
@@ -184,7 +209,7 @@
         </Grid>
 
         <!-- 底部狀態列 -->
-        <Border Grid.Row="2" Background="#FF007ACC" BorderBrush="#FF555555" BorderThickness="0,1,0,0" Padding="10,6">
+        <Border Grid.Row="2" Background="{DynamicResource AccentBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="10,6">
             <Grid>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="StatusTextBlock"

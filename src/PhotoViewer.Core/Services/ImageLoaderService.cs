@@ -1,6 +1,7 @@
 using PhotoViewer.Core.Models;
 using PhotoViewer.Core.Utilities;
 using SkiaSharp;
+using System.IO;
 
 namespace PhotoViewer.Core.Services;
 
@@ -38,23 +39,14 @@ public class ImageLoaderService : IDisposable
     public async Task<SKBitmap?> LoadThumbnailAsync(string filePath, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
-        {
-            Console.WriteLine($"[LoadThumbnail] File not found or empty path: {filePath}");
             return null;
-        }
 
-        Console.WriteLine($"[LoadThumbnail] START loading: {Path.GetFileName(filePath)}");
-
-        // 檢查記憶體快取
+        // 1. 檢查記憶體快取
         if (_memoryCache.TryGet(filePath, out var cachedBitmap))
         {
-            // Console.WriteLine($"[LoadThumbnail] Memory cache HIT: {Path.GetFileName(filePath)}");
             return cachedBitmap;
         }
 
-        // Console.WriteLine($"[LoadThumbnail] Memory cache MISS: {Path.GetFileName(filePath)}");
-
-        // 控制並發數量
         await _loadingSemaphore.WaitAsync(ct);
         
         Interlocked.Increment(ref _activeLoadCount);
@@ -62,31 +54,35 @@ public class ImageLoaderService : IDisposable
 
         try
         {
-            // 直接嘗試解碼縮圖（跳過快取系統來測試）
-            Console.WriteLine($"[LoadThumbnail] Decoding thumbnail directly from file...");
-            var bitmap = await _decoderService.DecodeThumbnailAsync(filePath, 128, ct);
-
-            if (bitmap == null)
+            // 2. 檢查/建立磁碟快取
+            var cacheEntry = await _cacheService.GetOrCreateAsync(filePath, ct);
+            
+            if (cacheEntry != null)
             {
-                Console.WriteLine($"[LoadThumbnail] FAILED to decode thumbnail for: {Path.GetFileName(filePath)}");
-                return null;
+                // 3. 從磁碟快取載入
+                var bitmap = await _cacheService.LoadThumbnailAsync(cacheEntry, ct);
+                
+                if (bitmap != null)
+                {
+                    // 4. 加入記憶體快取
+                    long size = bitmap.Width * bitmap.Height * 4;
+                    _memoryCache.GetOrCreate(filePath, () => bitmap, size);
+                    return bitmap;
+                }
             }
 
-            Console.WriteLine($"[LoadThumbnail] SUCCESS! Bitmap decoded: {bitmap.Width}x{bitmap.Height}");
-
-            // 估算 bitmap 大小
-            long size = bitmap.Width * bitmap.Height * 4; // RGBA
-
-            // 加入記憶體快取
-            _memoryCache.GetOrCreate(filePath, () => bitmap, size);
-            Console.WriteLine($"[LoadThumbnail] Added to memory cache: {Path.GetFileName(filePath)}");
-
-            return bitmap;
+            // 如果磁碟快取失敗（極少發生），回退到直接解碼
+            var fallbackBitmap = await _decoderService.DecodeThumbnailAsync(filePath, 128, ct);
+            if (fallbackBitmap != null)
+            {
+                long size = fallbackBitmap.Width * fallbackBitmap.Height * 4;
+                _memoryCache.GetOrCreate(filePath, () => fallbackBitmap, size);
+            }
+            return fallbackBitmap;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[LoadThumbnail] EXCEPTION: {ex.Message}");
-            Console.WriteLine($"[LoadThumbnail] Stack trace: {ex.StackTrace}");
+            Console.WriteLine($"[LoadThumbnail] Error: {ex.Message}");
             return null;
         }
         finally
@@ -130,6 +126,30 @@ public class ImageLoaderService : IDisposable
         {
             _loadingSemaphore.Release();
         }
+    }
+
+    /// <summary>
+    /// 載入動畫圖片 (GIF)
+    /// </summary>
+    public async Task<PhotoViewer.Core.Models.AnimatedImage?> LoadAnimatedImageAsync(string filePath, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            return null;
+
+        // 簡單檢查副檔名
+        var ext = Path.GetExtension(filePath).ToLower();
+        if (ext != ".gif")
+            return null;
+
+        return await Task.Run(() => _decoderService.DecodeGif(filePath), ct);
+    }
+
+    /// <summary>
+    /// 取得圖片 EXIF 資訊
+    /// </summary>
+    public async Task<Dictionary<string, string>> GetExifDataAsync(string filePath, CancellationToken ct = default)
+    {
+        return await Task.Run(() => _decoderService.GetExifData(filePath), ct);
     }
 
     /// <summary>
