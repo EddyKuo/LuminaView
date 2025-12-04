@@ -88,6 +88,8 @@ d:\code\LuminaView
 ### 發布 (Publish)
 *   **獨立執行檔 (推薦)**: 執行 `publish_self_contained.bat`
     *   產出單一 EXE，內含 Runtime，隨插即用。
+*   **最佳化單一執行檔 (更小)**: 執行 `publish_optimized.bat`
+    *   產出壓縮過的單一 EXE，體積更小，適合最終發布。
 *   **依賴框架**: 執行 `publish_framework_dependent.bat`
     *   檔案較小，需安裝 .NET 8 Runtime。
 
