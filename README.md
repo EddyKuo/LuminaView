@@ -7,6 +7,7 @@ LuminaView 是一款基於 .NET 8、WPF 和 SkiaSharp 打造的現代化高效�
 *   **極致效能**: 使用 **SkiaSharp** 進行硬體加速繪圖，取代傳統 WPF BitmapSource，實現 60FPS 的流暢縮放與平移。
 *   **海量瀏覽**: 實作自定義 **VirtualizingWrapPanel**，支援數萬張圖片的虛擬化滾動，記憶體占用極低。
 *   **智慧快取**: 內建 **SQLite** 資料庫與 LRU 快取機制，支援 **WebP 磁碟快取**，大幅加速二次載入。
+    *   快取位置: `%APPDATA%\LuminaView\Cache`
 *   **現代架構**: 採用 **MVVM** 架構與依賴注入 (DI)，確保程式碼的可維護性與測試性。
 *   **美觀介面**: 支援 **深色/淺色主題** 切換，並採用現代化 UI 設計。
 

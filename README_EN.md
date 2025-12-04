@@ -7,6 +7,7 @@ LuminaView is a modern, high-performance image viewer built with .NET 8, WPF, an
 *   **Extreme Performance**: Uses **SkiaSharp** for hardware-accelerated rendering, replacing traditional WPF BitmapSource to achieve smooth 60FPS zooming and panning.
 *   **Massive Browsing**: Implements a custom **VirtualizingWrapPanel**, supporting virtualized scrolling for tens of thousands of images with minimal memory usage.
 *   **Smart Caching**: Built-in **SQLite** database and LRU caching mechanism, supporting **WebP disk caching** to significantly accelerate subsequent loads.
+    *   Cache Location: `%APPDATA%\LuminaView\Cache`
 *   **Modern Architecture**: Adopts **MVVM** architecture and Dependency Injection (DI) to ensure code maintainability and testability.
 *   **Beautiful UI**: Supports **Dark/Light Theme** switching and features a modern UI design.
 
