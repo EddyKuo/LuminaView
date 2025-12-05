@@ -26,30 +26,78 @@ public class ImageDecoderService
     }
 
     /// <summary>
-    /// 解碼縮圖（直接縮放解碼，不載入完整圖片）
+    /// 解碼縮圖（使用 SKCodec 進行優化解碼）
     /// </summary>
     public SKBitmap? DecodeThumbnail(string filePath, int maxSize = 128)
     {
         try
         {
-            // 先載入完整圖片
-            using var original = DecodeBitmap(filePath);
-            if (original == null)
+            using var stream = File.OpenRead(filePath);
+            using var codec = SKCodec.Create(stream);
+
+            if (codec == null)
                 return null;
 
-            // 計算縮放比例
-            var scale = Math.Min((float)maxSize / original.Width, (float)maxSize / original.Height);
-            var targetWidth = (int)(original.Width * scale);
-            var targetHeight = (int)(original.Height * scale);
+            var info = codec.Info;
 
-            // 縮放
-            var resized = original.Resize(new SKImageInfo(targetWidth, targetHeight), SKFilterQuality.Medium);
-            return resized;
+            // 計算縮放比例
+            float scale = Math.Min((float)maxSize / info.Width, (float)maxSize / info.Height);
+
+            // 如果圖片本身比縮圖小，直接解碼
+            if (scale >= 1.0f)
+            {
+                // SKCodec.GetPixels needs a bitmap to write to.
+                // Or just use SKBitmap.Decode(codec) if available, but SKBitmap.Decode(stream) is easier.
+                // Here we use GetPixels to be consistent.
+                var bitmap = new SKBitmap(info);
+                var result = codec.GetPixels(info, bitmap.GetPixels());
+                if (result == SKCodecResult.Success || result == SKCodecResult.IncompleteInput)
+                    return bitmap;
+                return null;
+            }
+
+            // 計算目標尺寸
+            var targetInfo = new SKImageInfo((int)(info.Width * scale), (int)(info.Height * scale));
+
+            // 嘗試直接解碼為縮小的尺寸
+            // SKCodec.GetPixels 支援縮放的程度取決於格式 (JPEG 支援較好)
+            // 我們嘗試直接請求目標尺寸
+            var scaledBitmap = new SKBitmap(targetInfo);
+            var scaledResult = codec.GetPixels(targetInfo, scaledBitmap.GetPixels());
+
+            if (scaledResult == SKCodecResult.Success || scaledResult == SKCodecResult.IncompleteInput)
+            {
+                return scaledBitmap;
+            }
+
+            // 如果直接縮放失敗 (例如不支持的格式)，我們需要一個 fallback
+            // 我們可以嘗試讀取 full size 但這在 stream 上可能失敗，因為 codec 已經讀了一些
+            // 所以我們在 catch 區塊處理 fallback
+
+            // 主動拋出異常以觸發 fallback (或者在這裡重開 stream)
+            throw new NotSupportedException("Scaling not supported for this codec");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Console.WriteLine($"Failed to decode thumbnail {filePath}: {ex.Message}");
-            return null;
+            // Fallback: 傳統方式 (先載入再縮放)
+            // 由於 stream 可能已被讀取，我們重新打開檔案
+            try
+            {
+                using var original = DecodeBitmap(filePath);
+                if (original == null)
+                    return null;
+
+                var scale = Math.Min((float)maxSize / original.Width, (float)maxSize / original.Height);
+                var targetWidth = (int)(original.Width * scale);
+                var targetHeight = (int)(original.Height * scale);
+
+                return original.Resize(new SKImageInfo(targetWidth, targetHeight), SKFilterQuality.Medium);
+            }
+            catch (Exception ex2)
+            {
+                Console.WriteLine($"Fallback decode failed for {filePath}: {ex2.Message}");
+                return null;
+            }
         }
     }
 
@@ -145,9 +193,11 @@ public class ImageDecoderService
                 if (duration < 10) duration = 100;
 
                 var bitmap = new SKBitmap(info);
-                var opts = new SKCodecOptions(i);
                 
-                codec.GetPixels(info, bitmap.GetPixels(), opts);
+                // 正確使用 SKCodecOptions 來指定解碼哪一幀
+                var options = new SKCodecOptions(i);
+
+                codec.GetPixels(info, bitmap.GetPixels(), options);
                 
                 animatedImage.AddFrame(bitmap, duration);
             }
@@ -218,6 +268,4 @@ public class ImageDecoderService
 
         return exifData;
     }
-
-    // 移除不再需要的輔助方法
 }
