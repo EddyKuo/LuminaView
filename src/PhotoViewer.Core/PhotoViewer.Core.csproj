@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
@@ -12,6 +12,7 @@
     <PackageReference Include="MetadataExtractor" Version="2.9.0" />
     <PackageReference Include="SkiaSharp" Version="2.88.8" />
     <PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
+    <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="14.0.0" />
   </ItemGroup>
 
 </Project>
