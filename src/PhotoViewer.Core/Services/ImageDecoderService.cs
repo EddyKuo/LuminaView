@@ -1,10 +1,12 @@
+using ImageMagick;
 using SkiaSharp;
+using PhotoViewer.Core.Utilities;
 using System.IO;
 
 namespace PhotoViewer.Core.Services;
 
 /// <summary>
-/// 圖片解碼服務（使用 SkiaSharp）
+/// 圖片解碼服務（使用 SkiaSharp 與 Magick.NET）
 /// </summary>
 public class ImageDecoderService
 {
@@ -15,6 +17,11 @@ public class ImageDecoderService
     {
         try
         {
+            if (ImageUtils.IsRawFile(filePath))
+            {
+                return DecodeRaw(filePath);
+            }
+
             using var stream = File.OpenRead(filePath);
             return SKBitmap.Decode(stream);
         }
@@ -25,31 +32,107 @@ public class ImageDecoderService
         }
     }
 
-    /// <summary>
-    /// 解碼縮圖（直接縮放解碼，不載入完整圖片）
-    /// </summary>
-    public SKBitmap? DecodeThumbnail(string filePath, int maxSize = 128)
+    private SKBitmap? DecodeRaw(string filePath)
     {
         try
         {
-            // 先載入完整圖片
-            using var original = DecodeBitmap(filePath);
-            if (original == null)
-                return null;
-
-            // 計算縮放比例
-            var scale = Math.Min((float)maxSize / original.Width, (float)maxSize / original.Height);
-            var targetWidth = (int)(original.Width * scale);
-            var targetHeight = (int)(original.Height * scale);
-
-            // 縮放
-            var resized = original.Resize(new SKImageInfo(targetWidth, targetHeight), SKFilterQuality.Medium);
-            return resized;
+            using var image = new MagickImage(filePath);
+            // Convert to a format SkiaSharp understands (e.g., PNG or raw pixels)
+            using var memStream = new MemoryStream();
+            image.Write(memStream, MagickFormat.Png);
+            memStream.Position = 0;
+            return SKBitmap.Decode(memStream);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to decode thumbnail {filePath}: {ex.Message}");
-            return null;
+             Console.WriteLine($"Failed to decode RAW image {filePath}: {ex.Message}");
+             return null;
+        }
+    }
+
+    /// <summary>
+    /// 解碼縮圖（使用 SKCodec 進行優化解碼）
+    /// </summary>
+    public SKBitmap? DecodeThumbnail(string filePath, int maxSize = 128)
+    {
+        if (ImageUtils.IsRawFile(filePath))
+        {
+             // For RAW files, use Magick.NET to generate thumbnail
+             // Note: Ideally we should extract the embedded preview, but Magick.NET simplifies decoding.
+             try
+             {
+                 using var image = new MagickImage(filePath);
+                 image.Resize(maxSize, maxSize);
+
+                 using var memStream = new MemoryStream();
+                 image.Write(memStream, MagickFormat.Png);
+                 memStream.Position = 0;
+                 return SKBitmap.Decode(memStream);
+             }
+             catch (Exception ex)
+             {
+                 Console.WriteLine($"Failed to decode RAW thumbnail {filePath}: {ex.Message}");
+                 return null;
+             }
+        }
+
+        try
+        {
+            using var stream = File.OpenRead(filePath);
+            using var codec = SKCodec.Create(stream);
+
+            if (codec == null)
+                return null;
+
+            var info = codec.Info;
+
+            // 計算縮放比例
+            float scale = Math.Min((float)maxSize / info.Width, (float)maxSize / info.Height);
+
+            // 如果圖片本身比縮圖小，直接解碼
+            if (scale >= 1.0f)
+            {
+                var bitmap = new SKBitmap(info);
+                var result = codec.GetPixels(info, bitmap.GetPixels());
+                if (result == SKCodecResult.Success || result == SKCodecResult.IncompleteInput)
+                    return bitmap;
+                return null;
+            }
+
+            // 計算目標尺寸
+            var targetInfo = new SKImageInfo((int)(info.Width * scale), (int)(info.Height * scale));
+
+            // 嘗試直接解碼為縮小的尺寸
+            var scaledBitmap = new SKBitmap(targetInfo);
+            var scaledResult = codec.GetPixels(targetInfo, scaledBitmap.GetPixels());
+
+            if (scaledResult == SKCodecResult.Success || scaledResult == SKCodecResult.IncompleteInput)
+            {
+                return scaledBitmap;
+            }
+
+            throw new NotSupportedException("Scaling not supported for this codec");
+        }
+        catch (Exception)
+        {
+            // Fallback: 傳統方式 (先載入再縮放)
+            try
+            {
+                using var original = DecodeBitmap(filePath);
+                if (original == null)
+                    return null;
+
+                var scale = Math.Min((float)maxSize / original.Width, (float)maxSize / original.Height);
+                var targetWidth = (int)(original.Width * scale);
+                var targetHeight = (int)(original.Height * scale);
+
+                return original.Resize(new SKImageInfo(targetWidth, targetHeight), SKFilterQuality.Medium);
+            }
+            catch (Exception ex2)
+            {
+                Console.WriteLine($"Fallback decode failed for {filePath}: {ex2.Message}");
+                return null;
+            }
         }
     }
 
@@ -58,6 +141,20 @@ public class ImageDecoderService
     /// </summary>
     public (int Width, int Height)? GetImageDimensions(string filePath)
     {
+        if (ImageUtils.IsRawFile(filePath))
+        {
+            try
+            {
+                // Ping is faster than reading the file
+                var info = new MagickImageInfo(filePath);
+                return (info.Width, info.Height);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         try
         {
             using var stream = File.OpenRead(filePath);
@@ -145,9 +242,11 @@ public class ImageDecoderService
                 if (duration < 10) duration = 100;
 
                 var bitmap = new SKBitmap(info);
-                var opts = new SKCodecOptions(i);
                 
-                codec.GetPixels(info, bitmap.GetPixels(), opts);
+                // 正確使用 SKCodecOptions 來指定解碼哪一幀
+                var options = new SKCodecOptions(i);
+
+                codec.GetPixels(info, bitmap.GetPixels(), options);
                 
                 animatedImage.AddFrame(bitmap, duration);
             }
@@ -218,6 +317,4 @@ public class ImageDecoderService
 
         return exifData;
     }
-
-    // 移除不再需要的輔助方法
 }

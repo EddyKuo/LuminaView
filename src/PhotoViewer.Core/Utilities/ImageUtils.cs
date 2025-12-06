@@ -9,12 +9,30 @@ namespace PhotoViewer.Core.Utilities;
 public static class ImageUtils
 {
     /// <summary>
+    /// RAW 格式副檔名
+    /// </summary>
+    public static readonly HashSet<string> RawExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".arw", ".cr2", ".nef", ".dng", ".orf", ".rw2", ".raf", ".pef", ".srw"
+    };
+
+    /// <summary>
     /// 支持的圖片格式副檔名
     /// </summary>
     public static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
+        // Standard formats
         ".jpg", ".jpeg", ".png", ".bmp", ".webp", ".gif"
     };
+
+    static ImageUtils()
+    {
+        // Add RAW extensions to supported extensions
+        foreach (var ext in RawExtensions)
+        {
+            SupportedExtensions.Add(ext);
+        }
+    }
 
     /// <summary>
     /// 檢查檔案是否為支持的圖片格式
@@ -23,6 +41,15 @@ public static class ImageUtils
     {
         var extension = Path.GetExtension(filePath);
         return SupportedExtensions.Contains(extension);
+    }
+
+    /// <summary>
+    /// 檢查是否為 RAW 檔案
+    /// </summary>
+    public static bool IsRawFile(string filePath)
+    {
+        var extension = Path.GetExtension(filePath);
+        return RawExtensions.Contains(extension);
     }
 
     /// <summary>
@@ -73,6 +100,12 @@ public static class ImageUtils
     public static string GetImageFormat(string filePath)
     {
         var extension = Path.GetExtension(filePath).TrimStart('.');
+
+        if (IsRawFile(filePath))
+        {
+            return "RAW";
+        }
+
         return extension.ToLowerInvariant() switch
         {
             "jpg" or "jpeg" => "JPEG",
