@@ -8,7 +8,7 @@
         xmlns:controls="clr-namespace:PhotoViewer.App.Controls"
         xmlns:models="clr-namespace:PhotoViewer.Core.Models;assembly=PhotoViewer.Core"
         mc:Ignorable="d"
-        Title="LuminaView - 圖片瀏覽器"
+        Title="⚡ LUMINA VIEW - Cyberpunk Photo Viewer"
         Height="768"
         Width="1280"
         WindowState="Maximized"
@@ -21,10 +21,17 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- 頂部工具列 -->
-        <Border Grid.Row="0" Background="{DynamicResource SurfaceBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="15,10">
+        <!-- 頂部工具列 - Cyberpunk Style -->
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceBackgroundBrush}" BorderThickness="0,0,0,2" Padding="15,12">
+            <Border.BorderBrush>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#00F0FF" Offset="0"/>
+                    <GradientStop Color="#BB00FF" Offset="0.5"/>
+                    <GradientStop Color="#FF006E" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.BorderBrush>
             <Border.Effect>
-                <DropShadowEffect Color="#000000" ShadowDepth="2" BlurRadius="6" Opacity="0.15"/>
+                <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="15" Opacity="0.3"/>
             </Border.Effect>
             <StackPanel Orientation="Horizontal">
                 <Button x:Name="OpenFolderButton"
@@ -108,8 +115,19 @@
                          ShowsPreview="True"/>
 
             <!-- 右側圖片網格區域 -->
-            <Border Grid.Column="2" Background="{DynamicResource WindowBackgroundBrush}">
-                <Grid>
+            <Border Grid.Column="2">
+                <Border.Background>
+                    <DrawingBrush Viewport="0,0,50,50" ViewportUnits="Absolute" TileMode="Tile" Opacity="0.03">
+                        <DrawingBrush.Drawing>
+                            <GeometryDrawing Brush="{DynamicResource AccentBrush}">
+                                <GeometryDrawing.Geometry>
+                                    <RectangleGeometry Rect="0,0,50,1"/>
+                                </GeometryDrawing.Geometry>
+                            </GeometryDrawing>
+                        </DrawingBrush.Drawing>
+                    </DrawingBrush>
+                </Border.Background>
+                <Grid Background="{DynamicResource WindowBackgroundBrush}">
                     <!-- 圖片列表 (虛擬化) -->
                     <ListBox x:Name="ImageListBox"
                              Background="Transparent"
@@ -175,27 +193,27 @@
                                                 </Setter.Value>
                                             </Setter>
                                             <Style.Triggers>
-                                                <!-- Hover Effect -->
+                                                <!-- Hover Effect - Cyberpunk Neon Glow -->
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                     <Setter Property="Effect">
                                                         <Setter.Value>
-                                                            <DropShadowEffect Color="#007ACC" ShadowDepth="0" BlurRadius="15" Opacity="0.6"/>
+                                                            <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="25" Opacity="0.9"/>
                                                         </Setter.Value>
                                                     </Setter>
                                                     <Trigger.EnterActions>
                                                         <BeginStoryboard>
                                                             <Storyboard>
                                                                 <DoubleAnimation Storyboard.TargetProperty="(Border.RenderTransform).(ScaleTransform.ScaleX)"
-                                                                                To="1.05" Duration="0:0:0.15">
+                                                                                To="1.08" Duration="0:0:0.2">
                                                                     <DoubleAnimation.EasingFunction>
-                                                                        <CubicEase EasingMode="EaseOut"/>
+                                                                        <BackEase EasingMode="EaseOut" Amplitude="0.3"/>
                                                                     </DoubleAnimation.EasingFunction>
                                                                 </DoubleAnimation>
                                                                 <DoubleAnimation Storyboard.TargetProperty="(Border.RenderTransform).(ScaleTransform.ScaleY)"
-                                                                                To="1.05" Duration="0:0:0.15">
+                                                                                To="1.08" Duration="0:0:0.2">
                                                                     <DoubleAnimation.EasingFunction>
-                                                                        <CubicEase EasingMode="EaseOut"/>
+                                                                        <BackEase EasingMode="EaseOut" Amplitude="0.3"/>
                                                                     </DoubleAnimation.EasingFunction>
                                                                 </DoubleAnimation>
                                                             </Storyboard>
@@ -205,13 +223,13 @@
                                                         <BeginStoryboard>
                                                             <Storyboard>
                                                                 <DoubleAnimation Storyboard.TargetProperty="(Border.RenderTransform).(ScaleTransform.ScaleX)"
-                                                                                To="1.0" Duration="0:0:0.15">
+                                                                                To="1.0" Duration="0:0:0.2">
                                                                     <DoubleAnimation.EasingFunction>
                                                                         <CubicEase EasingMode="EaseOut"/>
                                                                     </DoubleAnimation.EasingFunction>
                                                                 </DoubleAnimation>
                                                                 <DoubleAnimation Storyboard.TargetProperty="(Border.RenderTransform).(ScaleTransform.ScaleY)"
-                                                                                To="1.0" Duration="0:0:0.15">
+                                                                                To="1.0" Duration="0:0:0.2">
                                                                     <DoubleAnimation.EasingFunction>
                                                                         <CubicEase EasingMode="EaseOut"/>
                                                                     </DoubleAnimation.EasingFunction>
@@ -220,16 +238,41 @@
                                                         </BeginStoryboard>
                                                     </Trigger.ExitActions>
                                                 </Trigger>
-                                                <!-- Selection Effect -->
+                                                <!-- Selection Effect - Pulsing Neon -->
                                                 <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
-                                                    <Setter Property="Background" Value="{DynamicResource SelectedBrush}"/>
-                                                    <Setter Property="BorderBrush" Value="{DynamicResource SelectedBorderBrush}"/>
+                                                    <Setter Property="Background">
+                                                        <Setter.Value>
+                                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                                <GradientStop Color="#150F1930" Offset="0"/>
+                                                                <GradientStop Color="#300F1930" Offset="1"/>
+                                                            </LinearGradientBrush>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource NeonCyanBrush}"/>
                                                     <Setter Property="BorderThickness" Value="3"/>
                                                     <Setter Property="Effect">
                                                         <Setter.Value>
-                                                            <DropShadowEffect Color="#0E639C" ShadowDepth="0" BlurRadius="20" Opacity="0.8"/>
+                                                            <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="30" Opacity="1.0"/>
                                                         </Setter.Value>
                                                     </Setter>
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                                <DoubleAnimation Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.BlurRadius)"
+                                                                                From="30" To="40" Duration="0:0:1.5">
+                                                                    <DoubleAnimation.EasingFunction>
+                                                                        <SineEase EasingMode="EaseInOut"/>
+                                                                    </DoubleAnimation.EasingFunction>
+                                                                </DoubleAnimation>
+                                                                <DoubleAnimation Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.Opacity)"
+                                                                                From="0.8" To="1.0" Duration="0:0:1.5">
+                                                                    <DoubleAnimation.EasingFunction>
+                                                                        <SineEase EasingMode="EaseInOut"/>
+                                                                    </DoubleAnimation.EasingFunction>
+                                                                </DoubleAnimation>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -245,24 +288,34 @@
                                         <Image Stretch="Uniform" Margin="8"
                                                util:ImageLoaderBehavior.ImagePath="{Binding FilePath}"/>
 
-                                        <!-- Selected Indicator -->
+                                        <!-- Selected Indicator - Cyberpunk Neon -->
                                         <Border x:Name="SelectedIndicator"
-                                                Width="28" Height="28"
-                                                Background="#007ACC"
-                                                CornerRadius="14"
+                                                Width="32" Height="32"
+                                                Background="{DynamicResource NeonCyanBrush}"
+                                                CornerRadius="16"
                                                 HorizontalAlignment="Right"
                                                 VerticalAlignment="Top"
-                                                Margin="0,8,8,0"
+                                                Margin="0,6,6,0"
                                                 Visibility="Collapsed">
                                             <Border.Effect>
-                                                <DropShadowEffect Color="#000000" ShadowDepth="2" BlurRadius="6" Opacity="0.4"/>
+                                                <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="20" Opacity="1.0"/>
                                             </Border.Effect>
-                                            <TextBlock Text="✓"
-                                                      Foreground="White"
-                                                      FontSize="16"
-                                                      FontWeight="Bold"
-                                                      HorizontalAlignment="Center"
-                                                      VerticalAlignment="Center"/>
+                                            <Grid>
+                                                <Ellipse Stroke="{DynamicResource NeonMagentaBrush}"
+                                                        StrokeThickness="2"
+                                                        Margin="2"
+                                                        Opacity="0.6">
+                                                    <Ellipse.Effect>
+                                                        <DropShadowEffect Color="#FF00FF" ShadowDepth="0" BlurRadius="10" Opacity="0.8"/>
+                                                    </Ellipse.Effect>
+                                                </Ellipse>
+                                                <TextBlock Text="✓"
+                                                          Foreground="#0A0E27"
+                                                          FontSize="18"
+                                                          FontWeight="ExtraBold"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"/>
+                                            </Grid>
                                         </Border>
 
                                         <!-- Filename Overlay -->
@@ -299,49 +352,100 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <!-- 無圖片提示 -->
+                    <!-- 無圖片提示 - Cyberpunk Style -->
                     <StackPanel x:Name="EmptyStatePanel"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                Visibility="Visible"
-                               IsHitTestVisible="False"
-                               Opacity="0.8">
-                        <TextBlock Text="📷"
-                                  FontSize="80"
-                                  HorizontalAlignment="Center"
-                                  Foreground="{DynamicResource SecondaryTextBrush}">
-                            <TextBlock.Effect>
-                                <DropShadowEffect Color="#000000" ShadowDepth="0" BlurRadius="20" Opacity="0.3"/>
-                            </TextBlock.Effect>
-                        </TextBlock>
-                        <TextBlock Text="請點擊「開啟檔案夾」選擇包含圖片的檔案夾"
-                                  FontSize="16"
-                                  Foreground="{DynamicResource SecondaryTextBrush}"
-                                  HorizontalAlignment="Center"
-                                  TextWrapping="Wrap"
-                                  TextAlignment="Center"
-                                  MaxWidth="400"
-                                  Margin="0,25,0,0"/>
-                        <TextBlock Text="支援 JPG, PNG, WebP, GIF, RAW 等格式"
-                                  FontSize="13"
-                                  Foreground="{DynamicResource SecondaryTextBrush}"
-                                  HorizontalAlignment="Center"
-                                  Opacity="0.6"
-                                  Margin="0,10,0,0"/>
+                               IsHitTestVisible="False">
+                        <Border CornerRadius="10" Padding="40,30" Background="#10000000"
+                                BorderThickness="2">
+                            <Border.BorderBrush>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                    <GradientStop Color="#00F0FF" Offset="0"/>
+                                    <GradientStop Color="#FF006E" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.BorderBrush>
+                            <Border.Effect>
+                                <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="30" Opacity="0.3"/>
+                            </Border.Effect>
+                            <StackPanel>
+                                <TextBlock Text="📷"
+                                          FontSize="90"
+                                          HorizontalAlignment="Center"
+                                          Foreground="{DynamicResource NeonCyanBrush}">
+                                    <TextBlock.Effect>
+                                        <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="30" Opacity="0.8"/>
+                                    </TextBlock.Effect>
+                                </TextBlock>
+                                <TextBlock Text="// NO DATA LOADED //"
+                                          FontSize="18"
+                                          FontWeight="Bold"
+                                          FontFamily="Consolas"
+                                          Foreground="{DynamicResource NeonCyanBrush}"
+                                          HorizontalAlignment="Center"
+                                          Margin="0,20,0,0">
+                                    <TextBlock.Effect>
+                                        <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="10" Opacity="0.6"/>
+                                    </TextBlock.Effect>
+                                </TextBlock>
+                                <TextBlock Text="請點擊「開啟檔案夾」選擇包含圖片的檔案夾"
+                                          FontSize="14"
+                                          Foreground="{DynamicResource SecondaryTextBrush}"
+                                          HorizontalAlignment="Center"
+                                          TextWrapping="Wrap"
+                                          TextAlignment="Center"
+                                          MaxWidth="400"
+                                          Margin="0,15,0,0"/>
+                                <Border Height="1" Background="{DynamicResource NeonPinkBrush}"
+                                       Margin="50,15" Opacity="0.3">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="#FF006E" ShadowDepth="0" BlurRadius="5" Opacity="0.5"/>
+                                    </Border.Effect>
+                                </Border>
+                                <TextBlock HorizontalAlignment="Center" Margin="0,10,0,0" FontSize="12"
+                                          FontFamily="Consolas">
+                                    <Run Text="SUPPORTED: " Foreground="{DynamicResource NeonPurpleBrush}" FontWeight="Bold"/>
+                                    <Run Text="JPG | PNG | WebP | GIF | " Foreground="{DynamicResource SecondaryTextBrush}"/>
+                                    <Run Text="RAW" Foreground="{DynamicResource NeonCyanBrush}" FontWeight="Bold"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Grid>
             </Border>
         </Grid>
 
-        <!-- 底部狀態列 -->
-        <Border Grid.Row="2" Background="{DynamicResource AccentBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="10,6">
+        <!-- 底部狀態列 - Cyberpunk Gradient -->
+        <Border Grid.Row="2" BorderThickness="0,2,0,0" Padding="12,8">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#FF0A0E27" Offset="0"/>
+                    <GradientStop Color="#FF0F1419" Offset="0.5"/>
+                    <GradientStop Color="#FF0A0E27" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Border.BorderBrush>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#00F0FF" Offset="0"/>
+                    <GradientStop Color="#FF006E" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.BorderBrush>
+            <Border.Effect>
+                <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="10" Opacity="0.2"/>
+            </Border.Effect>
             <Grid>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="StatusTextBlock"
-                              Text="就緒"
-                              Foreground="White"
+                              Text="⚡ READY"
+                              Foreground="{DynamicResource NeonCyanBrush}"
                               FontSize="12"
-                              Margin="0,0,10,0"/>
+                              FontWeight="Bold"
+                              Margin="0,0,10,0">
+                        <TextBlock.Effect>
+                            <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="8" Opacity="0.6"/>
+                        </TextBlock.Effect>
+                    </TextBlock>
                     
                     <ProgressBar x:Name="LoadingProgressBar"
                                 Width="100"
@@ -355,13 +459,14 @@
                     <TextBlock x:Name="MemoryUsageTextBlock"
                               Text=""
                               VerticalAlignment="Center"
-                              Foreground="White"
+                              Foreground="{DynamicResource SecondaryTextBrush}"
                               FontSize="11"
                               Margin="0,0,15,0"/>
-                    <TextBlock Text="LuminaView v0.1.0"
-                              VerticalAlignment="Center"
-                              Foreground="White"
-                              FontSize="11"/>
+                    <TextBlock VerticalAlignment="Center" FontSize="11">
+                        <Run Text="LUMINA" Foreground="{DynamicResource NeonCyanBrush}" FontWeight="Bold"/>
+                        <Run Text="VIEW" Foreground="{DynamicResource NeonMagentaBrush}" FontWeight="Bold"/>
+                        <Run Text=" v0.1.0" Foreground="{DynamicResource SecondaryTextBrush}"/>
+                    </TextBlock>
                 </StackPanel>
             </Grid>
         </Border>
