@@ -8,7 +8,9 @@
     <Color x:Key="AccentColor">#FF007ACC</Color>
     <Color x:Key="HoverColor">#FF3E3E42</Color>
     <Color x:Key="PressedColor">#FF007ACC</Color>
-    
+    <Color x:Key="SelectedColor">#FF2D2D30</Color>
+    <Color x:Key="SelectedBorderColor">#FF0E639C</Color>
+
     <SolidColorBrush x:Key="WindowBackgroundBrush" Color="{StaticResource WindowBackgroundColor}"/>
     <SolidColorBrush x:Key="SurfaceBackgroundBrush" Color="{StaticResource SurfaceBackgroundColor}"/>
     <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}"/>
@@ -17,4 +19,6 @@
     <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
     <SolidColorBrush x:Key="HoverBrush" Color="{StaticResource HoverColor}"/>
     <SolidColorBrush x:Key="PressedBrush" Color="{StaticResource PressedColor}"/>
+    <SolidColorBrush x:Key="SelectedBrush" Color="{StaticResource SelectedColor}"/>
+    <SolidColorBrush x:Key="SelectedBorderBrush" Color="{StaticResource SelectedBorderColor}"/>
 </ResourceDictionary>

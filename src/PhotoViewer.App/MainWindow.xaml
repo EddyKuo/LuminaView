@@ -22,36 +22,45 @@
         </Grid.RowDefinitions>
 
         <!-- 頂部工具列 -->
-        <Border Grid.Row="0" Background="{DynamicResource SurfaceBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="10,8">
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="15,10">
+            <Border.Effect>
+                <DropShadowEffect Color="#000000" ShadowDepth="2" BlurRadius="6" Opacity="0.15"/>
+            </Border.Effect>
             <StackPanel Orientation="Horizontal">
                 <Button x:Name="OpenFolderButton"
                         Content="📂 開啟檔案夾"
-                        Padding="15,8"
-                        Margin="0,0,10,0"
+                        Padding="18,10"
+                        Margin="0,0,15,0"
                         Click="OpenFolderButton_Click"
-                        Style="{StaticResource ModernButtonStyle}"/>
+                        Style="{StaticResource ModernButtonStyle}"
+                        FontWeight="SemiBold"
+                        FontSize="13"/>
+
+                <Border Width="1" Background="{DynamicResource BorderBrush}" Margin="10,0"/>
 
                 <TextBlock x:Name="FolderPathTextBlock"
                           Text="尚未選擇檔案夾"
                           VerticalAlignment="Center"
-                          Foreground="#FFCCCCCC"
+                          Foreground="{DynamicResource SecondaryTextBrush}"
                           FontSize="13"
-                          Margin="10,0"/>
+                          Margin="15,0"/>
 
                 <TextBlock x:Name="ImageCountTextBlock"
                           Text=""
                           VerticalAlignment="Center"
-                          Foreground="{DynamicResource SecondaryTextBrush}"
+                          Foreground="{DynamicResource AccentBrush}"
                           FontSize="12"
-                          Margin="20,0,0,0"/>
+                          FontWeight="SemiBold"
+                          Margin="15,0,0,0"/>
 
                 <Button x:Name="ThemeButton"
                         Content="🌓"
-                        Padding="10,5"
-                        Margin="20,0,0,0"
+                        Padding="12,8"
+                        Margin="25,0,0,0"
                         Click="ThemeButton_Click"
                         Style="{StaticResource ModernButtonStyle}"
-                        ToolTip="切換主題"/>
+                        ToolTip="切換深色/淺色主題"
+                        FontSize="16"/>
             </StackPanel>
         </Border>
 
@@ -124,10 +133,20 @@
                                 <Setter Property="Margin" Value="0"/>
                                 <Setter Property="BorderThickness" Value="0"/>
                                 <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
-                                            <ContentPresenter />
+                                            <Border x:Name="ItemBorder"
+                                                    Background="{TemplateBinding Background}"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="Transparent"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
                                         </ControlTemplate>
                                     </Setter.Value>
                                 </Setter>
@@ -136,54 +155,146 @@
 
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Width="150" Height="150" Margin="5"
+                                <Border x:Name="ThumbnailBorder"
+                                        Width="150" Height="150" Margin="5"
                                         Background="{DynamicResource SurfaceBackgroundBrush}"
                                         BorderBrush="{DynamicResource BorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="4"
+                                        BorderThickness="2"
+                                        CornerRadius="8"
                                         Cursor="Hand"
-                                        MouseLeftButtonDown="Thumbnail_MouseLeftButtonDown">
+                                        MouseLeftButtonDown="Thumbnail_MouseLeftButtonDown"
+                                        RenderTransformOrigin="0.5,0.5">
+                                    <Border.RenderTransform>
+                                        <ScaleTransform ScaleX="1" ScaleY="1"/>
+                                    </Border.RenderTransform>
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Setter Property="Effect">
                                                 <Setter.Value>
-                                                    <DropShadowEffect ShadowDepth="2" BlurRadius="5" Opacity="0.3"/>
+                                                    <DropShadowEffect Color="#000000" ShadowDepth="2" BlurRadius="8" Opacity="0.25"/>
                                                 </Setter.Value>
                                             </Setter>
                                             <Style.Triggers>
+                                                <!-- Hover Effect -->
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
                                                     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                     <Setter Property="Effect">
                                                         <Setter.Value>
-                                                            <DropShadowEffect ShadowDepth="4" BlurRadius="10" Opacity="0.5"/>
+                                                            <DropShadowEffect Color="#007ACC" ShadowDepth="0" BlurRadius="15" Opacity="0.6"/>
                                                         </Setter.Value>
                                                     </Setter>
+                                                    <Trigger.EnterActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="(Border.RenderTransform).(ScaleTransform.ScaleX)"
+                                                                                To="1.05" Duration="0:0:0.15">
+                                                                    <DoubleAnimation.EasingFunction>
+                                                                        <CubicEase EasingMode="EaseOut"/>
+                                                                    </DoubleAnimation.EasingFunction>
+                                                                </DoubleAnimation>
+                                                                <DoubleAnimation Storyboard.TargetProperty="(Border.RenderTransform).(ScaleTransform.ScaleY)"
+                                                                                To="1.05" Duration="0:0:0.15">
+                                                                    <DoubleAnimation.EasingFunction>
+                                                                        <CubicEase EasingMode="EaseOut"/>
+                                                                    </DoubleAnimation.EasingFunction>
+                                                                </DoubleAnimation>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </Trigger.EnterActions>
+                                                    <Trigger.ExitActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="(Border.RenderTransform).(ScaleTransform.ScaleX)"
+                                                                                To="1.0" Duration="0:0:0.15">
+                                                                    <DoubleAnimation.EasingFunction>
+                                                                        <CubicEase EasingMode="EaseOut"/>
+                                                                    </DoubleAnimation.EasingFunction>
+                                                                </DoubleAnimation>
+                                                                <DoubleAnimation Storyboard.TargetProperty="(Border.RenderTransform).(ScaleTransform.ScaleY)"
+                                                                                To="1.0" Duration="0:0:0.15">
+                                                                    <DoubleAnimation.EasingFunction>
+                                                                        <CubicEase EasingMode="EaseOut"/>
+                                                                    </DoubleAnimation.EasingFunction>
+                                                                </DoubleAnimation>
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </Trigger.ExitActions>
                                                 </Trigger>
+                                                <!-- Selection Effect -->
+                                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource SelectedBrush}"/>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SelectedBorderBrush}"/>
+                                                    <Setter Property="BorderThickness" Value="3"/>
+                                                    <Setter Property="Effect">
+                                                        <Setter.Value>
+                                                            <DropShadowEffect Color="#0E639C" ShadowDepth="0" BlurRadius="20" Opacity="0.8"/>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Border.Style>
                                     <Grid>
                                         <TextBlock Text="載入中..."
-                                                  Foreground="Gray"
+                                                  Foreground="#999999"
                                                   HorizontalAlignment="Center"
                                                   VerticalAlignment="Center"
-                                                  FontSize="11"/>
-                                        
-                                        <Image Stretch="Uniform" Margin="5"
+                                                  FontSize="11"
+                                                  FontStyle="Italic"/>
+
+                                        <Image Stretch="Uniform" Margin="8"
                                                util:ImageLoaderBehavior.ImagePath="{Binding FilePath}"/>
-                                        
-                                        <Border VerticalAlignment="Bottom" Background="#99000000" CornerRadius="0,0,3,3">
-                                            <TextBlock Text="{Binding FileName}"
-                                                      Foreground="{DynamicResource PrimaryTextBrush}"
+
+                                        <!-- Selected Indicator -->
+                                        <Border x:Name="SelectedIndicator"
+                                                Width="28" Height="28"
+                                                Background="#007ACC"
+                                                CornerRadius="14"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Top"
+                                                Margin="0,8,8,0"
+                                                Visibility="Collapsed">
+                                            <Border.Effect>
+                                                <DropShadowEffect Color="#000000" ShadowDepth="2" BlurRadius="6" Opacity="0.4"/>
+                                            </Border.Effect>
+                                            <TextBlock Text="✓"
+                                                      Foreground="White"
+                                                      FontSize="16"
+                                                      FontWeight="Bold"
                                                       HorizontalAlignment="Center"
-                                                      Margin="5,3"
-                                                      FontSize="11"
+                                                      VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <!-- Filename Overlay -->
+                                        <Border VerticalAlignment="Bottom"
+                                                Background="#CC000000"
+                                                CornerRadius="0,0,6,6"
+                                                Padding="8,4">
+                                            <TextBlock Text="{Binding FileName}"
+                                                      Foreground="White"
+                                                      HorizontalAlignment="Center"
+                                                      FontSize="10.5"
+                                                      FontWeight="Medium"
                                                       TextTrimming="CharacterEllipsis"
-                                                      MaxWidth="140"/>
+                                                      MaxWidth="135"/>
                                         </Border>
                                     </Grid>
+                                    <Border.Triggers>
+                                        <EventTrigger RoutedEvent="Border.Loaded">
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                    From="0" To="1" Duration="0:0:0.2"/>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </EventTrigger>
+                                    </Border.Triggers>
                                 </Border>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
+                                        <Setter TargetName="SelectedIndicator" Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -193,16 +304,30 @@
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                Visibility="Visible"
-                               IsHitTestVisible="False">
+                               IsHitTestVisible="False"
+                               Opacity="0.8">
                         <TextBlock Text="📷"
-                                  FontSize="72"
+                                  FontSize="80"
                                   HorizontalAlignment="Center"
-                                  Foreground="{DynamicResource SecondaryTextBrush}"/>
+                                  Foreground="{DynamicResource SecondaryTextBrush}">
+                            <TextBlock.Effect>
+                                <DropShadowEffect Color="#000000" ShadowDepth="0" BlurRadius="20" Opacity="0.3"/>
+                            </TextBlock.Effect>
+                        </TextBlock>
                         <TextBlock Text="請點擊「開啟檔案夾」選擇包含圖片的檔案夾"
                                   FontSize="16"
                                   Foreground="{DynamicResource SecondaryTextBrush}"
                                   HorizontalAlignment="Center"
-                                  Margin="0,20,0,0"/>
+                                  TextWrapping="Wrap"
+                                  TextAlignment="Center"
+                                  MaxWidth="400"
+                                  Margin="0,25,0,0"/>
+                        <TextBlock Text="支援 JPG, PNG, WebP, GIF, RAW 等格式"
+                                  FontSize="13"
+                                  Foreground="{DynamicResource SecondaryTextBrush}"
+                                  HorizontalAlignment="Center"
+                                  Opacity="0.6"
+                                  Margin="0,10,0,0"/>
                     </StackPanel>
                 </Grid>
             </Border>
