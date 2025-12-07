@@ -48,7 +48,19 @@ public static class ImageLoaderBehavior
         // 清除舊圖片
         imageControl.Source = null;
 
-        if (string.IsNullOrEmpty(path) || _imageLoader == null) return;
+        if (string.IsNullOrEmpty(path))
+        {
+            Console.WriteLine("[ImageLoaderBehavior] Path is null or empty");
+            return;
+        }
+
+        if (_imageLoader == null)
+        {
+            Console.WriteLine("[ImageLoaderBehavior] ERROR: _imageLoader is null! ImageLoaderBehavior.Initialize() was not called!");
+            return;
+        }
+
+        Console.WriteLine($"[ImageLoaderBehavior] Loading thumbnail for: {path}");
 
         // 建立新的 CancellationTokenSource
         var cts = new CancellationTokenSource();
@@ -79,7 +91,8 @@ public static class ImageLoaderBehavior
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Error loading image {path}: {ex.Message}");
+            Console.WriteLine($"[ImageLoaderBehavior] Error loading image {path}: {ex.Message}");
+            Console.WriteLine($"[ImageLoaderBehavior] Stack trace: {ex.StackTrace}");
         }
         finally
         {

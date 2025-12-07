@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private string _currentFolderPath = string.Empty;
 
     private System.Windows.Threading.DispatcherTimer? _memoryUpdateTimer;
+    private PhotoViewer.App.Controls.VirtualizingWrapPanel? _virtualizingPanel;
 
     public ObservableCollection<FolderNode> Folders { get; set; } = new();
 
@@ -188,6 +189,12 @@ public partial class MainWindow : Window
             // 顯示縮圖
             ImageListBox.ItemsSource = _currentImages;
 
+            // 訂閱預載入事件（僅執行一次）
+            if (_virtualizingPanel == null)
+            {
+                SubscribeToPreloadEvents();
+            }
+
             OpenFolderButton.IsEnabled = true;
         }
         catch (Exception ex)
@@ -303,6 +310,63 @@ public partial class MainWindow : Window
                 StatusTextBlock.Text = $"就緒";
             }
         });
+    }
+
+    /// <summary>
+    /// 訂閱 VirtualizingWrapPanel 的預載入事件
+    /// </summary>
+    private void SubscribeToPreloadEvents()
+    {
+        // 在視覺樹中尋找 VirtualizingWrapPanel
+        var listBox = ImageListBox;
+        _virtualizingPanel = FindVisualChild<PhotoViewer.App.Controls.VirtualizingWrapPanel>(listBox);
+
+        if (_virtualizingPanel != null)
+        {
+            _virtualizingPanel.PreloadRequested += OnPreloadRequested;
+        }
+    }
+
+    /// <summary>
+    /// 處理預載入請求事件
+    /// </summary>
+    private void OnPreloadRequested(object? sender, PhotoViewer.App.Controls.PreloadRequestEventArgs e)
+    {
+        if (_imageLoader == null || _currentImages.Count == 0) return;
+
+        var filePaths = _currentImages
+            .Skip(e.StartIndex)
+            .Take(e.Count)
+            .Select(img => img.FilePath)
+            .ToList();
+
+        // 後台預載入（fire-and-forget）
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _imageLoader.PreloadThumbnailsIntelligentAsync(filePaths, e.Count);
+            }
+            catch { /* 忽略後台錯誤 */ }
+        });
+    }
+
+    /// <summary>
+    /// 在視覺樹中尋找指定類型的子元素
+    /// </summary>
+    private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        if (parent == null) return null;
+
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T typedChild) return typedChild;
+
+            var result = FindVisualChild<T>(child);
+            if (result != null) return result;
+        }
+        return null;
     }
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)

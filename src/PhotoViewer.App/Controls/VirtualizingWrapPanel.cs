@@ -16,7 +16,14 @@ public class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
     public double ItemHeight { get; set; } = 160;
     
     // 緩衝區大小（螢幕外的額外行數）
-    private const int BufferRows = 2;
+    private const int BufferRows = 8;
+
+    // 滾動預測相關欄位
+    private readonly PhotoViewer.Core.Services.ScrollPredictionService _scrollPredictor = new();
+    private double _lastScrollOffset = 0;
+
+    // 預載入請求事件
+    public event EventHandler<PreloadRequestEventArgs>? PreloadRequested;
 
     // 轉換像素到邏輯單元
     private TranslateTransform _trans = new TranslateTransform();
@@ -247,6 +254,14 @@ public class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
             }
         }
 
+        // 新增：追蹤滾動並觸發預載入
+        if (Math.Abs(offset - _lastScrollOffset) > 10) // 防抖：忽略微滾動
+        {
+            _scrollPredictor.UpdateScrollPosition(offset);
+            TriggerPreload();
+            _lastScrollOffset = offset;
+        }
+
         _offset.Y = offset;
         ScrollOwner?.InvalidateScrollInfo();
         InvalidateMeasure(); // 觸發重新佈局
@@ -256,4 +271,62 @@ public class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
     {
         return Rect.Empty;
     }
+
+    /// <summary>
+    /// 觸發預載入事件（基於滾動方向和速度）
+    /// </summary>
+    private void TriggerPreload()
+    {
+        var itemsControl = ItemsControl.GetItemsOwner(this);
+        int itemCount = itemsControl?.Items.Count ?? 0;
+        if (itemCount == 0) return;
+
+        int itemsPerRow = CalculateItemsPerRow(_viewport.Width);
+        if (itemsPerRow <= 0) itemsPerRow = 1;
+
+        var direction = _scrollPredictor.GetDirection();
+        var preloadCount = _scrollPredictor.GetPreloadCount();
+
+        // 計算當前可見範圍
+        int currentRow = (int)Math.Floor(_offset.Y / ItemHeight);
+        int currentIndex = currentRow * itemsPerRow;
+
+        int preloadStartIndex;
+        if (direction == PhotoViewer.Core.Services.ScrollPredictionService.ScrollDirection.Down)
+        {
+            // 向下滾動：預載入下方
+            int lastVisibleRow = (int)Math.Ceiling((_offset.Y + _viewport.Height) / ItemHeight);
+            preloadStartIndex = (lastVisibleRow + BufferRows) * itemsPerRow;
+        }
+        else if (direction == PhotoViewer.Core.Services.ScrollPredictionService.ScrollDirection.Up)
+        {
+            // 向上滾動：預載入上方
+            preloadStartIndex = Math.Max(0, (currentRow - BufferRows - (preloadCount / itemsPerRow)) * itemsPerRow);
+        }
+        else
+        {
+            return; // 無明確方向
+        }
+
+        preloadStartIndex = Math.Max(0, Math.Min(preloadStartIndex, itemCount - 1));
+        int actualPreloadCount = Math.Min(preloadCount, itemCount - preloadStartIndex);
+
+        if (actualPreloadCount > 0)
+        {
+            PreloadRequested?.Invoke(this, new PreloadRequestEventArgs
+            {
+                StartIndex = preloadStartIndex,
+                Count = actualPreloadCount
+            });
+        }
+    }
+}
+
+/// <summary>
+/// 預載入請求事件參數
+/// </summary>
+public class PreloadRequestEventArgs : EventArgs
+{
+    public int StartIndex { get; set; }
+    public int Count { get; set; }
 }

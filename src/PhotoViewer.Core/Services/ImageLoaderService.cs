@@ -14,8 +14,14 @@ public class ImageLoaderService : IDisposable
     private readonly ThumbnailCacheService _cacheService;
     private readonly ImageDecoderService _decoderService;
     private readonly LruCache<string, SKBitmap> _memoryCache;
-    private readonly SemaphoreSlim _loadingSemaphore;
+    private readonly SemaphoreSlim _regularImageSemaphore;  // 普通圖片信號量
+    private readonly SemaphoreSlim _rawImageSemaphore;      // RAW 圖片信號量
     private int _activeLoadCount;
+
+    // 智能預載入相關欄位
+    private CancellationTokenSource? _preloadCts;
+    private Task? _preloadTask;
+    private readonly SemaphoreSlim _preloadLock = new SemaphoreSlim(1);
 
     public event EventHandler<int>? LoadingStatusChanged;
     public int ActiveLoadCount => _activeLoadCount;
@@ -23,14 +29,24 @@ public class ImageLoaderService : IDisposable
     /// <summary>
     /// 建構子
     /// </summary>
-    /// <param name="maxConcurrentLoads">最大並發載入數量</param>
+    /// <param name="maxConcurrentLoads">最大並發載入數量（0 = 自動使用所有 CPU 核心）</param>
     /// <param name="memoryCacheSizeMb">記憶體快取大小（MB）</param>
-    public ImageLoaderService(int maxConcurrentLoads = 4, int memoryCacheSizeMb = 200)
+    public ImageLoaderService(int maxConcurrentLoads = 0, int memoryCacheSizeMb = 500)
     {
         _cacheService = new ThumbnailCacheService();
         _decoderService = new ImageDecoderService();
-        _memoryCache = new LruCache<string, SKBitmap>(maxCapacity: 500, maxMemoryMb: memoryCacheSizeMb);
-        _loadingSemaphore = new SemaphoreSlim(maxConcurrentLoads);
+        _memoryCache = new LruCache<string, SKBitmap>(maxCapacity: 1000, maxMemoryMb: memoryCacheSizeMb);
+
+        // 0 表示自動使用所有 CPU 核心，否則使用指定數量
+        int concurrentThreads = maxConcurrentLoads > 0
+            ? maxConcurrentLoads
+            : Environment.ProcessorCount;
+
+        // 獨立信號量：普通圖片 vs RAW 圖片
+        _regularImageSemaphore = new SemaphoreSlim(concurrentThreads);
+        _rawImageSemaphore = new SemaphoreSlim(concurrentThreads * 2); // RAW 2x 並發（I/O 密集）
+
+        Console.WriteLine($"[ImageLoaderService] 使用 {concurrentThreads} 個普通圖片執行緒, {concurrentThreads * 2} 個 RAW 圖片執行緒");
     }
 
     /// <summary>
@@ -38,8 +54,19 @@ public class ImageLoaderService : IDisposable
     /// </summary>
     public async Task<SKBitmap?> LoadThumbnailAsync(string filePath, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+        Console.WriteLine($"[LoadThumbnailAsync] Called with: {filePath}");
+
+        if (string.IsNullOrEmpty(filePath))
+        {
+            Console.WriteLine($"[LoadThumbnailAsync] FilePath is null or empty");
             return null;
+        }
+
+        if (!File.Exists(filePath))
+        {
+            Console.WriteLine($"[LoadThumbnailAsync] File does not exist: {filePath}");
+            return null;
+        }
 
         // 1. 檢查記憶體快取
         if (_memoryCache.TryGet(filePath, out var cachedBitmap))
@@ -47,13 +74,17 @@ public class ImageLoaderService : IDisposable
             return cachedBitmap;
         }
 
-        await _loadingSemaphore.WaitAsync(ct);
-        
-        Interlocked.Increment(ref _activeLoadCount);
-        LoadingStatusChanged?.Invoke(this, _activeLoadCount);
+        // 根據文件類型選擇信號量
+        bool isRaw = ImageUtils.IsRawFile(filePath);
+        var semaphore = isRaw ? _rawImageSemaphore : _regularImageSemaphore;
+
+        await semaphore.WaitAsync(ct);
 
         try
         {
+            Interlocked.Increment(ref _activeLoadCount);
+            LoadingStatusChanged?.Invoke(this, _activeLoadCount);
+
             // 2. 檢查/建立磁碟快取
             var cacheEntry = await _cacheService.GetOrCreateAsync(filePath, ct);
             
@@ -82,14 +113,15 @@ public class ImageLoaderService : IDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[LoadThumbnail] Error: {ex.Message}");
+            Console.WriteLine($"[LoadThumbnail] Error for {filePath}: {ex.Message}");
+            Console.WriteLine($"[LoadThumbnail] Stack trace: {ex.StackTrace}");
             return null;
         }
         finally
         {
             Interlocked.Decrement(ref _activeLoadCount);
             LoadingStatusChanged?.Invoke(this, _activeLoadCount);
-            _loadingSemaphore.Release();
+            semaphore.Release();
         }
     }
 
@@ -109,7 +141,11 @@ public class ImageLoaderService : IDisposable
             return cachedBitmap;
         }
 
-        await _loadingSemaphore.WaitAsync(ct);
+        // 根據文件類型選擇信號量
+        bool isRaw = ImageUtils.IsRawFile(filePath);
+        var semaphore = isRaw ? _rawImageSemaphore : _regularImageSemaphore;
+
+        await semaphore.WaitAsync(ct);
 
         try
         {
@@ -124,7 +160,7 @@ public class ImageLoaderService : IDisposable
         }
         finally
         {
-            _loadingSemaphore.Release();
+            semaphore.Release();
         }
     }
 
@@ -153,7 +189,7 @@ public class ImageLoaderService : IDisposable
     }
 
     /// <summary>
-    /// 批次載入縮圖
+    /// 批次載入縮圖（高效能版本，充分利用所有 CPU 核心）
     /// </summary>
     public async Task<List<(string FilePath, SKBitmap? Bitmap)>> LoadThumbnailBatchAsync(
         IEnumerable<string> filePaths,
@@ -162,11 +198,12 @@ public class ImageLoaderService : IDisposable
     {
         var results = new List<(string, SKBitmap?)>();
         var filePathList = filePaths.ToList();
-        int current = 0;
         int total = filePathList.Count;
+        int completed = 0;
 
-        // 分批處理，避免一次性載入太多
-        const int batchSize = 20;
+        // 使用更大的批次大小以充分利用並行處理能力
+        // 批次大小 = CPU 核心數 * 3（確保管線始終滿載）
+        int batchSize = Math.Max(Environment.ProcessorCount * 3, 50);
 
         for (int i = 0; i < total; i += batchSize)
         {
@@ -177,14 +214,13 @@ public class ImageLoaderService : IDisposable
             var tasks = batch.Select(async path =>
             {
                 var bitmap = await LoadThumbnailAsync(path, ct);
+                Interlocked.Increment(ref completed);
+                progress?.Report((completed, total));
                 return (path, bitmap);
             });
 
             var batchResults = await Task.WhenAll(tasks);
             results.AddRange(batchResults);
-
-            current += batchResults.Length;
-            progress?.Report((current, total));
         }
 
         return results;
@@ -201,6 +237,70 @@ public class ImageLoaderService : IDisposable
 
         // 使用快取服務批次處理
         await _cacheService.GetOrCreateBatchAsync(filePathList, null, ct);
+    }
+
+    /// <summary>
+    /// 智能預載入縮圖（基於滾動預測）
+    /// 低優先級後台任務，支援取消
+    /// </summary>
+    public async Task PreloadThumbnailsIntelligentAsync(
+        IEnumerable<string> filePaths,
+        int priorityCount = 100,
+        CancellationToken ct = default)
+    {
+        // 取消之前的預載入任務
+        await CancelPreloadAsync();
+
+        await _preloadLock.WaitAsync(ct);
+        try
+        {
+            _preloadCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var preloadCt = _preloadCts.Token;
+
+            _preloadTask = Task.Run(async () =>
+            {
+                var filePathList = filePaths.Take(priorityCount).ToList();
+
+                foreach (var path in filePathList)
+                {
+                    if (preloadCt.IsCancellationRequested) break;
+
+                    // 跳過已在記憶體快取的項目
+                    if (_memoryCache.TryGet(path, out _)) continue;
+
+                    // 後台載入（忽略錯誤）
+                    try
+                    {
+                        await LoadThumbnailAsync(path, preloadCt);
+                    }
+                    catch (OperationCanceledException) { break; }
+                    catch { /* 忽略後台預載入錯誤 */ }
+                }
+            }, preloadCt);
+        }
+        finally
+        {
+            _preloadLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// 取消進行中的預載入任務
+    /// </summary>
+    private async Task CancelPreloadAsync()
+    {
+        if (_preloadCts != null)
+        {
+            _preloadCts.Cancel();
+            _preloadCts.Dispose();
+            _preloadCts = null;
+        }
+
+        if (_preloadTask != null)
+        {
+            try { await _preloadTask; } catch { }
+            _preloadTask = null;
+        }
     }
 
     /// <summary>
@@ -247,9 +347,12 @@ public class ImageLoaderService : IDisposable
 
     public void Dispose()
     {
+        CancelPreloadAsync().Wait();
+        _preloadLock?.Dispose();
         _cacheService?.Dispose();
         _memoryCache?.Clear();
-        _loadingSemaphore?.Dispose();
+        _regularImageSemaphore?.Dispose();
+        _rawImageSemaphore?.Dispose();
         GC.SuppressFinalize(this);
     }
 }

@@ -171,7 +171,6 @@ public class SkiaCanvasControl : SKElement
         // 繪製圖片
         var paint = new SKPaint
         {
-            FilterQuality = SKFilterQuality.High,
             IsAntialias = true
         };
 
@@ -187,13 +186,16 @@ public class SkiaCanvasControl : SKElement
         var paint = new SKPaint
         {
             Color = SKColors.Gray,
-            TextSize = 24,
-            IsAntialias = true,
-            TextAlign = SKTextAlign.Center
+            IsAntialias = true
+        };
+
+        var font = new SKFont
+        {
+            Size = 24
         };
 
         var text = "No Image";
-        canvas.DrawText(text, width / 2, height / 2, paint);
+        canvas.DrawText(text, width / 2, height / 2, SKTextAlign.Center, font, paint);
     }
 
     /// <summary>

@@ -13,8 +13,8 @@ public class ThumbnailCacheService : IDisposable
 {
     private const int THUMBNAIL_SIZE = 128;
     private const int WEBP_QUALITY = 85;
-    private const long MAX_CACHE_SIZE_BYTES = 1024L * 1024 * 1024; // 1GB
-    private const int CACHE_EXPIRY_DAYS = 30;
+    private const long MAX_CACHE_SIZE_BYTES = 5L * 1024 * 1024 * 1024; // 5GB
+    private const int CACHE_EXPIRY_DAYS = 60;
 
     private readonly string _cacheDirectory;
     private readonly string _thumbnailDirectory;
@@ -77,8 +77,42 @@ public class ThumbnailCacheService : IDisposable
     private async Task InitializeDatabaseAsync()
     {
         await _database.CreateTableAsync<CacheEntry>();
+
+        // 啟用 Write-Ahead Logging (WAL) 模式以提高並發性
+        try
+        {
+            await _database.ExecuteAsync("PRAGMA journal_mode=WAL");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ThumbnailCache] Warning: Could not enable WAL mode: {ex.Message}");
+            // 非致命錯誤，繼續執行
+        }
+
+        // 增加頁面快取大小（10MB）
+        try
+        {
+            await _database.ExecuteAsync("PRAGMA cache_size=-10000");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ThumbnailCache] Warning: Could not set cache size: {ex.Message}");
+        }
+
+        // Synchronous 模式 NORMAL（快取資料可接受）
+        try
+        {
+            await _database.ExecuteAsync("PRAGMA synchronous=NORMAL");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ThumbnailCache] Warning: Could not set synchronous mode: {ex.Message}");
+        }
+
+        // 建立索引
         await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS idx_modified ON cache_entries(Modified)");
         await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS idx_hash ON cache_entries(Hash)");
+        await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS idx_lastaccessed ON cache_entries(LastAccessed)");
     }
 
     /// <summary>
@@ -265,17 +299,25 @@ public class ThumbnailCacheService : IDisposable
         if (stats.TotalSize <= MAX_CACHE_SIZE_BYTES)
             return 0;
 
-        // 依最後存取時間排序，刪除最舊的
-        var entries = await _database.Table<CacheEntry>()
-            .OrderBy(e => e.LastAccessed)
-            .ToListAsync();
+        // 優化：估算需要刪除的條目數量
+        var targetSize = (long)(MAX_CACHE_SIZE_BYTES * 0.8); // 清理到 80%
+        var toRemove = stats.TotalSize - targetSize;
+
+        // 估計條目數（平均每個 WebP 縮圖約 65KB）
+        int estimatedCount = (int)(toRemove / 65536) + 100; // +100 緩衝
+
+        // 使用索引查詢獲取最舊的條目（使用 LIMIT）
+        var entries = await _database.QueryAsync<CacheEntry>(
+            "SELECT * FROM cache_entries ORDER BY LastAccessed ASC LIMIT ?",
+            estimatedCount
+        );
 
         int removedCount = 0;
         long currentSize = stats.TotalSize;
 
         foreach (var entry in entries)
         {
-            if (currentSize <= MAX_CACHE_SIZE_BYTES * 0.8) // 清理到 80%
+            if (currentSize <= targetSize)
                 break;
 
             try

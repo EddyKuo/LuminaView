@@ -54,6 +54,7 @@ public class CacheEntry
     /// <summary>
     /// 最後存取時間（用於 LRU 清理）
     /// </summary>
+    [Indexed]
     public DateTime LastAccessed { get; set; }
 
     /// <summary>
