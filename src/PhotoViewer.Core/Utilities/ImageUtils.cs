@@ -13,7 +13,7 @@ public static class ImageUtils
     /// </summary>
     public static readonly HashSet<string> RawExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".arw", ".cr2", ".nef", ".dng", ".orf", ".rw2", ".raf", ".pef", ".srw"
+        ".arw", ".cr2", ".cr3", ".nef", ".dng", ".orf", ".rw2", ".raf", ".pef", ".srw"
     };
 
     /// <summary>
