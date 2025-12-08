@@ -16,6 +16,27 @@
         AllowDrop="True"
         Drop="Window_Drop">
 
+    <Window.Resources>
+        <Storyboard x:Key="SidebarCollapseStoryboard">
+            <DoubleAnimation Storyboard.TargetName="SidebarContainer"
+                             Storyboard.TargetProperty="Width"
+                             To="0" Duration="0:0:0.3">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseInOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+        <Storyboard x:Key="SidebarExpandStoryboard">
+            <DoubleAnimation Storyboard.TargetName="SidebarContainer"
+                             Storyboard.TargetProperty="Width"
+                             To="250" Duration="0:0:0.3">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseInOut"/>
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -23,34 +44,13 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Grid.Resources>
-            <Storyboard x:Key="SidebarCollapseStoryboard">
-                <DoubleAnimation Storyboard.TargetName="SidebarColumn"
-                                 Storyboard.TargetProperty="Width"
-                                 To="0" Duration="0:0:0.3">
-                    <DoubleAnimation.EasingFunction>
-                        <CubicEase EasingMode="EaseInOut"/>
-                    </DoubleAnimation.EasingFunction>
-                </DoubleAnimation>
-            </Storyboard>
-            <Storyboard x:Key="SidebarExpandStoryboard">
-                <DoubleAnimation Storyboard.TargetName="SidebarColumn"
-                                 Storyboard.TargetProperty="Width"
-                                 To="250" Duration="0:0:0.3">
-                    <DoubleAnimation.EasingFunction>
-                        <CubicEase EasingMode="EaseInOut"/>
-                    </DoubleAnimation.EasingFunction>
-                </DoubleAnimation>
-            </Storyboard>
-        </Grid.Resources>
-
         <!-- 頂部工具列 -->
         <Border Grid.Row="0" Background="{DynamicResource SurfaceBackgroundBrush}" BorderThickness="0,0,0,2" Padding="15,12">
             <Border.BorderBrush>
                 <StaticResource ResourceKey="MainToolbarGradient"/>
             </Border.BorderBrush>
             <Border.Effect>
-                <DropShadowEffect Color="{DynamicResource ShadowColor}" ShadowDepth="0" BlurRadius="15" Opacity="0.3"/>
+                <DropShadowEffect Color="{StaticResource ShadowColor}" ShadowDepth="0" BlurRadius="15" Opacity="0.3"/>
             </Border.Effect>
             <StackPanel Orientation="Horizontal">
                 <ToggleButton x:Name="SidebarToggleButton"
@@ -58,7 +58,7 @@
                               Margin="0,0,15,0"
                               Click="SidebarToggleButton_Click"
                               IsChecked="True"
-                              Style="{StaticResource ModernButtonStyle}"
+                              Style="{StaticResource ModernToggleButtonStyle}"
                               ToolTip="Toggle Sidebar">
                     <Path Data="{StaticResource Icon_Menu}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Width="16" Height="16" Stretch="Uniform"/>
                 </ToggleButton>
@@ -101,19 +101,27 @@
                         ToolTip="切換深色/淺色主題">
                     <Path Data="{StaticResource Icon_Theme}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform"/>
                 </Button>
+
+                <ToggleButton x:Name="FilterToggleButton"
+                              Padding="12,8"
+                              Margin="10,0,0,0"
+                              Style="{StaticResource ModernToggleButtonStyle}"
+                              ToolTip="顯示/隱藏篩選器">
+                    <Path Data="{StaticResource Icon_Filter}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Width="16" Height="16" Stretch="Uniform"/>
+                </ToggleButton>
             </StackPanel>
         </Border>
 
         <!-- 主內容區域 -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="SidebarColumn" Width="250" MinWidth="0" MaxWidth="500"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <!-- Left Sidebar (Folder Tree) -->
-            <Border Grid.Column="0" Background="{DynamicResource SurfaceBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
+            <Border x:Name="SidebarContainer" Grid.Column="0" Width="250" Background="{DynamicResource SurfaceBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
                 <TreeView x:Name="FolderTreeView" 
                           ItemsSource="{Binding Folders}" 
                           Background="Transparent" 
@@ -161,8 +169,56 @@
                     </DrawingBrush>
                 </Border.Background>
                 <Grid Background="{DynamicResource WindowBackgroundBrush}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Filter Panel -->
+                    <Border Grid.Row="0" 
+                            Background="{DynamicResource SurfaceBackgroundBrush}" 
+                            BorderBrush="{DynamicResource BorderBrush}" 
+                            BorderThickness="0,0,0,1"
+                            Padding="15,10"
+                            Visibility="{Binding IsChecked, ElementName=FilterToggleButton, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel Orientation="Horizontal">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,20,0">
+                                <TextBlock Text="格式:" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,0,8,0"/>
+                                <ComboBox Width="100" SelectedValue="{Binding SelectedFormat}" SelectedValuePath="Content">
+                                    <ComboBoxItem Content="All" IsSelected="True"/>
+                                    <ComboBoxItem Content="JPG"/>
+                                    <ComboBoxItem Content="PNG"/>
+                                    <ComboBoxItem Content="WEBP"/>
+                                    <ComboBoxItem Content="GIF"/>
+                                    <ComboBoxItem Content="RAW"/>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,20,0">
+                                <TextBlock Text="大小:" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,0,8,0"/>
+                                <ComboBox Width="120" SelectedIndex="{Binding SelectedSizeIndex}">
+                                    <ComboBoxItem Content="全部"/>
+                                    <ComboBoxItem Content="小於 1MB"/>
+                                    <ComboBoxItem Content="1MB - 10MB"/>
+                                    <ComboBoxItem Content="大於 10MB"/>
+                                </ComboBox>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="日期:" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,0,8,0"/>
+                                <ComboBox Width="120" SelectedIndex="{Binding SelectedDateIndex}">
+                                    <ComboBoxItem Content="全部"/>
+                                    <ComboBoxItem Content="今天"/>
+                                    <ComboBoxItem Content="本週"/>
+                                    <ComboBoxItem Content="本月"/>
+                                </ComboBox>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
                     <!-- 圖片列表 (虛擬化) -->
                     <ListBox x:Name="ImageListBox"
+                             Grid.Row="1"
                              Background="Transparent"
                              BorderThickness="0"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -399,10 +455,11 @@
 
                     <!-- 無圖片提示 -->
                     <StackPanel x:Name="EmptyStatePanel"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               Visibility="Visible"
-                               IsHitTestVisible="False">
+                                Grid.Row="1"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="Visible"
+                                IsHitTestVisible="False">
                         <Border CornerRadius="10" Padding="40,30" Background="#10000000"
                                 BorderThickness="2">
                             <Border.BorderBrush>

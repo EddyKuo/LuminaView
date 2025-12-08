@@ -1,6 +1,9 @@
 using ImageMagick;
 using SkiaSharp;
 using PhotoViewer.Core.Utilities;
+using PhotoViewer.Core.Models;
+using MetadataExtractor;
+using MetadataExtractor.Formats.Exif;
 using System.IO;
 
 namespace PhotoViewer.Core.Services;
@@ -98,8 +101,8 @@ public class ImageDecoderService
         }
         catch (Exception ex)
         {
-             Console.WriteLine($"Failed to decode RAW image {filePath}: {ex.Message}");
-             return null;
+            Console.WriteLine($"Failed to decode RAW image {filePath}: {ex.Message}");
+            return null;
         }
     }
 
@@ -239,71 +242,71 @@ public class ImageDecoderService
     {
         if (ImageUtils.IsRawFile(filePath))
         {
-             // 四級回退策略（優先級從高到低）
+            // 四級回退策略（優先級從高到低）
 
-             // 策略 1: LibRaw 提取內嵌縮圖（最快，10-50ms）
-             var librawThumbnail = _libRawDecoder.ExtractThumbnail(filePath, maxSize);
-             if (librawThumbnail != null)
-             {
-                 return librawThumbnail;
-             }
+            // 策略 1: LibRaw 提取內嵌縮圖（最快，10-50ms）
+            var librawThumbnail = _libRawDecoder.ExtractThumbnail(filePath, maxSize);
+            if (librawThumbnail != null)
+            {
+                return librawThumbnail;
+            }
 
-             // 策略 2: LibRaw 半尺寸解碼（快速回退，100-200ms）
-             var librawHalfSize = _libRawDecoder.DecodeHalfSize(filePath);
-             if (librawHalfSize != null)
-             {
-                 // 縮小到 maxSize
-                 if (librawHalfSize.Width > maxSize || librawHalfSize.Height > maxSize)
-                 {
-                     var scale = Math.Min((float)maxSize / librawHalfSize.Width, (float)maxSize / librawHalfSize.Height);
-                     var targetWidth = (int)(librawHalfSize.Width * scale);
-                     var targetHeight = (int)(librawHalfSize.Height * scale);
-                     var samplingOptions = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Nearest);
-                     var resized = librawHalfSize.Resize(new SKImageInfo(targetWidth, targetHeight), samplingOptions);
-                     librawHalfSize.Dispose();
-                     return resized;
-                 }
-                 return librawHalfSize;
-             }
+            // 策略 2: LibRaw 半尺寸解碼（快速回退，100-200ms）
+            var librawHalfSize = _libRawDecoder.DecodeHalfSize(filePath);
+            if (librawHalfSize != null)
+            {
+                // 縮小到 maxSize
+                if (librawHalfSize.Width > maxSize || librawHalfSize.Height > maxSize)
+                {
+                    var scale = Math.Min((float)maxSize / librawHalfSize.Width, (float)maxSize / librawHalfSize.Height);
+                    var targetWidth = (int)(librawHalfSize.Width * scale);
+                    var targetHeight = (int)(librawHalfSize.Height * scale);
+                    var samplingOptions = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Nearest);
+                    var resized = librawHalfSize.Resize(new SKImageInfo(targetWidth, targetHeight), samplingOptions);
+                    librawHalfSize.Dispose();
+                    return resized;
+                }
+                return librawHalfSize;
+            }
 
-             // 策略 3: MetadataExtractor/Magick.NET 提取內嵌縮圖（兼容性回退）
-             var embeddedThumbnail = ExtractRawEmbeddedThumbnail(filePath, maxSize);
-             if (embeddedThumbnail != null)
-             {
-                 return embeddedThumbnail;
-             }
+            // 策略 3: MetadataExtractor/Magick.NET 提取內嵌縮圖（兼容性回退）
+            var embeddedThumbnail = ExtractRawEmbeddedThumbnail(filePath, maxSize);
+            if (embeddedThumbnail != null)
+            {
+                return embeddedThumbnail;
+            }
 
-             // 策略 4: Magick.NET 完整解碼（最慢但最可靠，200-500ms）
-             try
-             {
-                 using var image = new MagickImage();
+            // 策略 4: Magick.NET 完整解碼（最慢但最可靠，200-500ms）
+            try
+            {
+                using var image = new MagickImage();
 
-                 // 優化設定：降低品質以加速
-                 var settings = new MagickReadSettings
-                 {
-                     // 使用草稿模式（draft mode）加速 RAW 解碼
-                     Width = (uint)maxSize,
-                     Height = (uint)maxSize,
-                 };
+                // 優化設定：降低品質以加速
+                var settings = new MagickReadSettings
+                {
+                    // 使用草稿模式（draft mode）加速 RAW 解碼
+                    Width = (uint)maxSize,
+                    Height = (uint)maxSize,
+                };
 
-                 image.Read(filePath, settings);
+                image.Read(filePath, settings);
 
-                 // 確保縮圖不超過 maxSize
-                 if (image.Width > maxSize || image.Height > maxSize)
-                 {
-                     image.Resize((uint)maxSize, (uint)maxSize);
-                 }
+                // 確保縮圖不超過 maxSize
+                if (image.Width > maxSize || image.Height > maxSize)
+                {
+                    image.Resize((uint)maxSize, (uint)maxSize);
+                }
 
-                 using var memStream = new MemoryStream();
-                 image.Write(memStream, MagickFormat.Png);
-                 memStream.Position = 0;
-                 return SKBitmap.Decode(memStream);
-             }
-             catch (Exception ex)
-             {
-                 Console.WriteLine($"[Magick.NET] RAW 縮圖解碼失敗: {ex.Message}");
-                 return null;
-             }
+                using var memStream = new MemoryStream();
+                image.Write(memStream, MagickFormat.Png);
+                memStream.Position = 0;
+                return SKBitmap.Decode(memStream);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Magick.NET] RAW 縮圖解碼失敗: {ex.Message}");
+                return null;
+            }
         }
 
         try
@@ -403,33 +406,45 @@ public class ImageDecoderService
     }
 
     /// <summary>
-    /// 儲存圖片為 WebP 格式
+    /// 儲存圖片為 WebP 格式到檔案
     /// </summary>
     public bool SaveAsWebP(SKBitmap bitmap, string outputPath, int quality = 85)
+    {
+        try
+        {
+            // 確保目錄存在
+            var directory = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(directory) && !System.IO.Directory.Exists(directory))
+            {
+                System.IO.Directory.CreateDirectory(directory);
+            }
+
+            using var fileStream = File.Create(outputPath);
+            return SaveAsWebP(bitmap, fileStream, quality);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to save WebP {outputPath}: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 儲存圖片為 WebP 格式到串流
+    /// </summary>
+    public bool SaveAsWebP(SKBitmap bitmap, Stream outputStream, int quality = 85)
     {
         try
         {
             using var image = SKImage.FromBitmap(bitmap);
             using var data = image.Encode(SKEncodedImageFormat.Webp, quality);
 
-            if (data == null)
-                return false;
-
-            // 確保目錄存在
-            var directory = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            using var fileStream = File.Create(outputPath);
-            data.SaveTo(fileStream);
-
+            data.SaveTo(outputStream);
             return true;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to save WebP {outputPath}: {ex.Message}");
+            Console.WriteLine($"Failed to save WebP to stream: {ex.Message}");
             return false;
         }
     }
@@ -489,6 +504,99 @@ public class ImageDecoderService
             Console.WriteLine($"Failed to decode GIF {filePath}: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// 讀取結構化的 EXIF 資訊
+    /// </summary>
+    public ExifInfo GetExifInfo(string filePath)
+    {
+        var info = new ExifInfo();
+
+        try
+        {
+            var directories = MetadataExtractor.ImageMetadataReader.ReadMetadata(filePath);
+
+            // 1. 嘗試從 ExifIfd0Directory 讀取相機資訊
+            var ifd0 = directories.OfType<ExifIfd0Directory>().FirstOrDefault();
+            if (ifd0 != null)
+            {
+                info.Make = ifd0.GetString(ExifIfd0Directory.TagMake) ?? "";
+                info.Model = ifd0.GetString(ExifIfd0Directory.TagModel) ?? "";
+            }
+
+            // 2. 嘗試從 ExifSubIfdDirectory 讀取拍攝參數
+            var subIfd = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
+            if (subIfd != null)
+            {
+                info.Lens = subIfd.GetString(ExifSubIfdDirectory.TagLensModel) ?? "";
+                
+                // 光圈
+                if (subIfd.ContainsTag(ExifSubIfdDirectory.TagFNumber))
+                {
+                    double fNumber = subIfd.GetDouble(ExifSubIfdDirectory.TagFNumber);
+                    info.FNumber = $"f/{fNumber:0.0}";
+                }
+
+                // 快門
+                if (subIfd.ContainsTag(ExifSubIfdDirectory.TagExposureTime))
+                {
+                    double exposureTime = subIfd.GetDouble(ExifSubIfdDirectory.TagExposureTime);
+                    info.ExposureTime = exposureTime < 1.0 
+                        ? $"1/{Math.Round(1.0 / exposureTime)}" 
+                        : $"{exposureTime}s";
+                }
+
+                // ISO
+                // TagIsoEquivalent = 0x8827, TagIsoSpeed = 0x8833
+                string? iso = subIfd.GetString(ExifSubIfdDirectory.TagIsoEquivalent);
+                if (string.IsNullOrEmpty(iso))
+                {
+                     // 嘗試其他 ISO 標籤
+                     if (subIfd.ContainsTag(0x8833)) // TagIsoSpeed
+                        iso = subIfd.GetString(0x8833);
+                }
+                
+                if (!string.IsNullOrEmpty(iso)) info.Iso = $"ISO {iso}";
+
+                // 焦距
+                if (subIfd.ContainsTag(ExifSubIfdDirectory.TagFocalLength))
+                {
+                    double focalLength = subIfd.GetDouble(ExifSubIfdDirectory.TagFocalLength);
+                    info.FocalLength = $"{focalLength}mm";
+                }
+
+                // 拍攝時間
+                if (subIfd.ContainsTag(ExifSubIfdDirectory.TagDateTimeOriginal))
+                {
+                    try 
+                    {
+                        info.DateTaken = subIfd.GetDateTime(ExifSubIfdDirectory.TagDateTimeOriginal);
+                    }
+                    catch {}
+                }
+            }
+
+            // 3. 嘗試從 GpsDirectory 讀取位置
+            /*
+            var gps = directories.OfType<GpsDirectory>().FirstOrDefault();
+            if (gps != null)
+            {
+                var location = gps.GetGeoLocation();
+                if (location != null)
+                {
+                    info.Latitude = location.Latitude;
+                    info.Longitude = location.Longitude;
+                }
+            }
+            */
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error reading structured EXIF: {ex.Message}");
+        }
+
+        return info;
     }
 
     /// <summary>

@@ -26,10 +26,7 @@ public class CacheEntry
     [Indexed]
     public DateTime Modified { get; set; }
 
-    /// <summary>
-    /// 縮圖檔案路徑（WebP 格式）
-    /// </summary>
-    public string ThumbnailPath { get; set; } = string.Empty;
+
 
     /// <summary>
     /// 圖片寬度
