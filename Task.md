@@ -95,11 +95,21 @@
       public string FilePath { get; set; }
       public string Hash { get; set; }
       public DateTime Modified { get; set; }
-      public string ThumbnailPath { get; set; }
+      // public string ThumbnailPath { get; set; } // Removed in v0.3.1
       public int Width { get; set; }
       public int Height { get; set; }
       public DateTime CachedAt { get; set; }
   }
+  ```
+  - [x] **P3.1.4** 實現 ThumbnailBlob 模型 (v0.3.1 新增)
+  ```csharp
+  public class ThumbnailBlob
+  {
+      [PrimaryKey]
+      public string Hash { get; set; }
+      public byte[] Data { get; set; }
+  }
+  ```
   ```
   - 優先級: 🟡 High
   - 預估: 0.5 天
@@ -338,16 +348,13 @@
   - 子目錄: `thumbnails`, `temp`
   - 預估: 0.5 天
 
-- [x] **P3.2.2** 實現 WebP 快取存儲
+- [x] **P3.2.2** 實現 SQLite Blob 快取存儲 (v0.3.1 更新)
   ```csharp
-  private async Task SaveThumbnailAsync(SKBitmap bitmap, string cachePath)
-  {
-      using var data = bitmap.Encode(SKEncodedImageFormat.Webp, 85);
-      using var stream = File.Create(cachePath);
-      await data.AsStream().CopyToAsync(stream);
-  }
+  // 儲存到 SQLite Blob 表，不再使用個別檔案
+  var thumbnailBlob = new ThumbnailBlob { Hash = hash, Data = bytes };
+  await _db.InsertOrReplaceAsync(thumbnailBlob);
   ```
-  - 壓縮率: 85% (平衡品質和大小)
+  - 優勢: 單一檔案管理，無碎檔問題，交易安全
   - 預估: 1 天
 
 - [x] **P3.2.3** 實現快取清理機制
@@ -591,17 +598,7 @@
 
 ---
 
-## 📋 Phase 7: 部署與腳本 (新增)
 
-### ✅ P7.1 建置腳本
-- [x] **P7.1.1** 建立 build_debug.bat
-- [x] **P7.1.2** 建立 build_release.bat
-
-### ✅ P7.2 發布腳本
-- [x] **P7.2.1** 建立 publish_self_contained.bat
-- [x] **P7.2.2** 建立 publish_framework_dependent.bat
-
----
 
 ## 📋 Phase 6: 進階功能 (第11-12週)
 
@@ -618,15 +615,15 @@
   - 預估: 1 day
 
 ### ✅ P6.2 圖片篩選
-- [ ] **P6.2.1** 按類型篩選
+- [x] **P6.2.1** 按類型篩選
   - JPG / PNG / WebP / BMP / GIF
   - 預估: 1 day
 
-- [ ] **P6.2.2** 按大小篩選
+- [x] **P6.2.2** 按大小篩選
   - 小於 1MB / 1-10MB / > 10MB
   - 預估: 0.5 day
 
-- [ ] **P6.2.3** 按日期篩選
+- [x] **P6.2.3** 按日期篩選
   - 今天 / 本週 / 本月 / 自訂
   - 預估: 0.5 day
 
@@ -681,6 +678,18 @@
   - 預估: 1.5 day
 
 **Phase 6 總預估**: 11 天
+
+---
+
+## 📋 Phase 7: 部署與腳本 (新增)
+
+### ✅ P7.1 建置腳本
+- [x] **P7.1.1** 建立 build_debug.bat
+- [x] **P7.1.2** 建立 build_release.bat
+
+### ✅ P7.2 發布腳本
+- [x] **P7.2.1** 建立 publish_self_contained.bat
+- [x] **P7.2.2** 建立 publish_framework_dependent.bat
 
 ---
 
@@ -762,6 +771,12 @@
 - 完成檔案夾樹狀導航
 - 完成圖片檢視器 (縮放/平移/旋轉)
 - 新增建置與發布腳本
+  
+### v0.3.1 (2025-12-08) - 穩定性與效能優化
+- **重構**: 縮圖快取從檔案系統遷移至 SQLite Blob (單一檔案，更可靠)
+- **修復**: 解決側邊欄切換與動畫錯誤
+- **修復**: 解決縮圖生成時的 AccessViolationException (Use-after-free)
+- **優化**: 提升大量縮圖載入時的並發穩定性
 
 ### v0.2.0 (2025-12-03) - Phase 2 & 3 完成
 - 完成 SkiaSharp 集成

@@ -57,7 +57,12 @@ public class ImageItem
     public DateTime Created { get; set; }
 
     /// <summary>
-    /// EXIF 資訊
+    /// EXIF 資訊 (原始字典)
     /// </summary>
     public Dictionary<string, string> ExifData { get; set; } = new();
+
+    /// <summary>
+    /// 結構化的 EXIF 資訊
+    /// </summary>
+    public ExifInfo? Exif { get; set; }
 }

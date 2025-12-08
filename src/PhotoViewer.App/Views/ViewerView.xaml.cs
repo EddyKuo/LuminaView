@@ -97,11 +97,20 @@ public partial class ViewerView : Window
             }
 
             // 載入 EXIF 資訊
-            if (currentImage.ExifData.Count == 0)
+            if (currentImage.ExifData.Count == 0 || currentImage.Exif == null)
             {
-                currentImage.ExifData = await _imageLoader.GetExifDataAsync(currentImage.FilePath);
+                // 並行載入原始 EXIF 和結構化 EXIF
+                var exifDataTask = _imageLoader.GetExifDataAsync(currentImage.FilePath);
+                var exifInfoTask = _imageLoader.GetExifInfoAsync(currentImage.FilePath);
+
+                await Task.WhenAll(exifDataTask, exifInfoTask);
+
+                currentImage.ExifData = exifDataTask.Result;
+                currentImage.Exif = exifInfoTask.Result;
             }
+            
             ExifListView.ItemsSource = currentImage.ExifData;
+            UpdateExifUI(currentImage.Exif);
 
             // 短暫延遲確保 bitmap 已設定到視覺樹
             await Dispatcher.BeginInvoke(new Action(() =>
@@ -139,6 +148,42 @@ public partial class ViewerView : Window
         // 更新按鈕狀態
         PreviousButton.IsEnabled = _currentIndex > 0;
         NextButton.IsEnabled = _currentIndex < _images.Count - 1;
+    }
+
+    /// <summary>
+    /// 更新 EXIF UI
+    /// </summary>
+    private void UpdateExifUI(PhotoViewer.Core.Models.ExifInfo? exif)
+    {
+        if (exif == null)
+        {
+            ExifCameraText.Text = "無相機資訊";
+            ExifLensText.Text = "";
+            ExifIsoText.Text = "-";
+            ExifApertureText.Text = "-";
+            ExifShutterText.Text = "-";
+            ExifFocalLengthText.Text = "-";
+            ExifDateText.Text = "-";
+            return;
+        }
+
+        // 相機型號
+        string camera = $"{exif.Make} {exif.Model}".Trim();
+        ExifCameraText.Text = string.IsNullOrEmpty(camera) ? "未知相機" : camera;
+
+        // 鏡頭
+        ExifLensText.Text = exif.Lens;
+
+        // 參數
+        ExifIsoText.Text = string.IsNullOrEmpty(exif.Iso) ? "-" : exif.Iso;
+        ExifApertureText.Text = string.IsNullOrEmpty(exif.FNumber) ? "-" : exif.FNumber;
+        ExifShutterText.Text = string.IsNullOrEmpty(exif.ExposureTime) ? "-" : exif.ExposureTime;
+        ExifFocalLengthText.Text = string.IsNullOrEmpty(exif.FocalLength) ? "-" : exif.FocalLength;
+        
+        // 時間
+        ExifDateText.Text = exif.DateTaken.HasValue 
+            ? exif.DateTaken.Value.ToString("yyyy/MM/dd HH:mm") 
+            : "-";
     }
 
     /// <summary>

@@ -17,7 +17,6 @@ public class ThumbnailCacheService : IDisposable
     private const int CACHE_EXPIRY_DAYS = 60;
 
     private readonly string _cacheDirectory;
-    private readonly string _thumbnailDirectory;
     private readonly string _databasePath;
     private readonly SQLiteAsyncConnection _database;
     private readonly ImageDecoderService _imageDecoder;
@@ -34,12 +33,10 @@ public class ThumbnailCacheService : IDisposable
             "Cache"
         );
 
-        _thumbnailDirectory = Path.Combine(_cacheDirectory, "thumbnails");
         _databasePath = Path.Combine(_cacheDirectory, "cache.db");
 
         // 確保目錄存在
         Directory.CreateDirectory(_cacheDirectory);
-        Directory.CreateDirectory(_thumbnailDirectory);
 
         // 初始化資料庫
         _database = new SQLiteAsyncConnection(_databasePath);
@@ -77,6 +74,7 @@ public class ThumbnailCacheService : IDisposable
     private async Task InitializeDatabaseAsync()
     {
         await _database.CreateTableAsync<CacheEntry>();
+        await _database.CreateTableAsync<ThumbnailBlob>();
 
         // 啟用 Write-Ahead Logging (WAL) 模式以提高並發性
         try
@@ -86,7 +84,6 @@ public class ThumbnailCacheService : IDisposable
         catch (Exception ex)
         {
             Console.WriteLine($"[ThumbnailCache] Warning: Could not enable WAL mode: {ex.Message}");
-            // 非致命錯誤，繼續執行
         }
 
         // 增加頁面快取大小（10MB）
@@ -113,6 +110,17 @@ public class ThumbnailCacheService : IDisposable
         await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS idx_modified ON cache_entries(Modified)");
         await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS idx_hash ON cache_entries(Hash)");
         await _database.ExecuteAsync("CREATE INDEX IF NOT EXISTS idx_lastaccessed ON cache_entries(LastAccessed)");
+        
+        // 清理舊的 thumbnails 目錄 (如果存在)
+        var oldThumbnailDir = Path.Combine(_cacheDirectory, "thumbnails");
+        if (Directory.Exists(oldThumbnailDir))
+        {
+            try
+            {
+                Directory.Delete(oldThumbnailDir, true);
+            }
+            catch { /* 忽略刪除錯誤 */ }
+        }
     }
 
     /// <summary>
@@ -142,8 +150,12 @@ public class ThumbnailCacheService : IDisposable
                 existingEntry.LastAccessed = DateTime.Now;
                 await _database.UpdateAsync(existingEntry);
 
-                // 驗證縮圖檔案是否存在
-                if (File.Exists(existingEntry.ThumbnailPath))
+                // 檢查 Blob 是否真的存在
+                var blobExists = await _database.Table<ThumbnailBlob>()
+                    .Where(b => b.Hash == existingEntry.Hash)
+                    .CountAsync() > 0;
+
+                if (blobExists)
                 {
                     return existingEntry;
                 }
@@ -171,20 +183,24 @@ public class ThumbnailCacheService : IDisposable
             if (bitmap == null)
                 return null;
 
+            int width = bitmap.Width;
+            int height = bitmap.Height;
+
             // 計算 Hash
             var hash = await ImageUtils.ComputeFileHashAsync(filePath, ct);
 
-            // 生成縮圖檔案路徑
-            var thumbnailFileName = $"{hash}.webp";
-            var thumbnailPath = Path.Combine(_thumbnailDirectory, thumbnailFileName);
+            // 儲存為 WebP 到記憶體
+            using var ms = new MemoryStream();
+            var saved = _imageDecoder.SaveAsWebP(bitmap, ms, WEBP_QUALITY);
+            
+            bitmap.Dispose();
 
-            // 儲存為 WebP
-            var saved = _imageDecoder.SaveAsWebP(bitmap, thumbnailPath, WEBP_QUALITY);
             if (!saved)
             {
-                bitmap.Dispose();
                 return null;
             }
+
+            var thumbnailData = ms.ToArray();
 
             // 建立快取項目
             var cacheEntry = new CacheEntry
@@ -192,19 +208,26 @@ public class ThumbnailCacheService : IDisposable
                 FilePath = filePath,
                 Hash = hash,
                 Modified = modified,
-                ThumbnailPath = thumbnailPath,
-                Width = bitmap.Width,
-                Height = bitmap.Height,
+                Width = width,
+                Height = height,
                 FileSize = fileSize,
                 Format = ImageUtils.GetImageFormat(filePath),
                 CachedAt = DateTime.Now,
                 LastAccessed = DateTime.Now
             };
 
-            bitmap.Dispose();
+            var thumbnailBlob = new ThumbnailBlob
+            {
+                Hash = hash,
+                Data = thumbnailData
+            };
 
-            // 儲存到資料庫
-            await _database.InsertOrReplaceAsync(cacheEntry);
+            // 使用交易寫入資料庫
+            await _database.RunInTransactionAsync(tran =>
+            {
+                tran.InsertOrReplace(thumbnailBlob);
+                tran.InsertOrReplace(cacheEntry);
+            });
 
             return cacheEntry;
         }
@@ -226,7 +249,13 @@ public class ThumbnailCacheService : IDisposable
             .Where(e => e.FilePath == filePath && e.Hash == hash)
             .FirstOrDefaultAsync();
 
-        return entry != null && File.Exists(entry.ThumbnailPath);
+        if (entry == null) return false;
+
+        var blobExists = await _database.Table<ThumbnailBlob>()
+            .Where(b => b.Hash == hash)
+            .CountAsync() > 0;
+
+        return blobExists;
     }
 
     /// <summary>
@@ -236,18 +265,13 @@ public class ThumbnailCacheService : IDisposable
     {
         await EnsureInitializedAsync();
 
-        var entries = await _database.Table<CacheEntry>().ToListAsync();
-        long totalSize = 0;
+        var count = await _database.Table<CacheEntry>().CountAsync();
+        
+        // 這裡只能估算，因為計算所有 Blob 大小太慢
+        // 假設平均每個縮圖 10KB
+        long totalSize = count * 10240; 
 
-        foreach (var entry in entries)
-        {
-            if (File.Exists(entry.ThumbnailPath))
-            {
-                totalSize += new FileInfo(entry.ThumbnailPath).Length;
-            }
-        }
-
-        return (entries.Count, totalSize);
+        return (count, totalSize);
     }
 
     /// <summary>
@@ -268,14 +292,14 @@ public class ThumbnailCacheService : IDisposable
         {
             try
             {
-                // 刪除縮圖檔案
-                if (File.Exists(entry.ThumbnailPath))
+                await _database.RunInTransactionAsync(tran =>
                 {
-                    File.Delete(entry.ThumbnailPath);
-                }
-
-                // 從資料庫刪除
-                await _database.DeleteAsync(entry);
+                    tran.Delete(entry);
+                    // 注意：如果多個檔案共用同一個 Hash (內容相同)，這裡刪除 Blob 可能會影響其他檔案
+                    // 但在這個應用場景中，通常 Hash 是唯一的，或者我們可以接受重新生成
+                    // 更嚴謹的作法是檢查引用計數，但這裡簡化處理
+                    tran.Execute("DELETE FROM thumbnail_blobs WHERE Hash = ?", entry.Hash);
+                });
                 removedCount++;
             }
             catch (Exception ex)
@@ -294,42 +318,34 @@ public class ThumbnailCacheService : IDisposable
     {
         await EnsureInitializedAsync();
 
-        var stats = await GetCacheStatsAsync();
-
-        if (stats.TotalSize <= MAX_CACHE_SIZE_BYTES)
+        // 簡單檢查：如果資料庫檔案超過限制
+        var dbInfo = new FileInfo(_databasePath);
+        if (dbInfo.Length <= MAX_CACHE_SIZE_BYTES)
             return 0;
 
-        // 優化：估算需要刪除的條目數量
-        var targetSize = (long)(MAX_CACHE_SIZE_BYTES * 0.8); // 清理到 80%
-        var toRemove = stats.TotalSize - targetSize;
+        // 需要清理
+        var targetSize = (long)(MAX_CACHE_SIZE_BYTES * 0.8);
+        var toRemoveBytes = dbInfo.Length - targetSize;
+        
+        // 估算需要刪除的條目數 (假設平均 10KB)
+        int estimatedCount = (int)(toRemoveBytes / 10240) + 100;
 
-        // 估計條目數（平均每個 WebP 縮圖約 65KB）
-        int estimatedCount = (int)(toRemove / 65536) + 100; // +100 緩衝
-
-        // 使用索引查詢獲取最舊的條目（使用 LIMIT）
         var entries = await _database.QueryAsync<CacheEntry>(
             "SELECT * FROM cache_entries ORDER BY LastAccessed ASC LIMIT ?",
             estimatedCount
         );
 
         int removedCount = 0;
-        long currentSize = stats.TotalSize;
 
         foreach (var entry in entries)
         {
-            if (currentSize <= targetSize)
-                break;
-
             try
             {
-                if (File.Exists(entry.ThumbnailPath))
+                await _database.RunInTransactionAsync(tran =>
                 {
-                    var fileSize = new FileInfo(entry.ThumbnailPath).Length;
-                    File.Delete(entry.ThumbnailPath);
-                    currentSize -= fileSize;
-                }
-
-                await _database.DeleteAsync(entry);
+                    tran.Delete(entry);
+                    tran.Execute("DELETE FROM thumbnail_blobs WHERE Hash = ?", entry.Hash);
+                });
                 removedCount++;
             }
             catch (Exception ex)
@@ -337,6 +353,9 @@ public class ThumbnailCacheService : IDisposable
                 Console.WriteLine($"Error removing cache entry: {ex.Message}");
             }
         }
+        
+        // 執行 VACUUM 以釋放磁碟空間 (這可能會花一點時間)
+        await _database.ExecuteAsync("VACUUM");
 
         return removedCount;
     }
@@ -348,21 +367,9 @@ public class ThumbnailCacheService : IDisposable
     {
         await EnsureInitializedAsync();
 
-        // 刪除所有縮圖檔案
-        if (Directory.Exists(_thumbnailDirectory))
-        {
-            foreach (var file in Directory.GetFiles(_thumbnailDirectory))
-            {
-                try
-                {
-                    File.Delete(file);
-                }
-                catch { }
-            }
-        }
-
-        // 清空資料庫
         await _database.DeleteAllAsync<CacheEntry>();
+        await _database.DeleteAllAsync<ThumbnailBlob>();
+        await _database.ExecuteAsync("VACUUM");
     }
 
     /// <summary>
@@ -370,14 +377,18 @@ public class ThumbnailCacheService : IDisposable
     /// </summary>
     public async Task<SkiaSharp.SKBitmap?> LoadThumbnailAsync(CacheEntry entry, CancellationToken ct = default)
     {
-        if (!File.Exists(entry.ThumbnailPath))
-            return null;
-
         try
         {
+            var blob = await _database.Table<ThumbnailBlob>()
+                .Where(b => b.Hash == entry.Hash)
+                .FirstOrDefaultAsync();
+
+            if (blob == null || blob.Data == null)
+                return null;
+
             return await Task.Run(() =>
             {
-                using var stream = File.OpenRead(entry.ThumbnailPath);
+                using var stream = new MemoryStream(blob.Data);
                 return SkiaSharp.SKBitmap.Decode(stream);
             }, ct);
         }

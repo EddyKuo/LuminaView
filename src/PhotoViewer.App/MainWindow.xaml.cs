@@ -19,8 +19,53 @@ public partial class MainWindow : Window
     private ImageLoaderService? _imageLoader;
     private readonly FileWatcherService _fileWatcher;
     private readonly Services.ThemeService _themeService;
-    private List<ImageItem> _currentImages = new();
+    private List<ImageItem> _allImages = new(); // 所有圖片
+    public ObservableCollection<ImageItem> FilteredImages { get; private set; } = new(); // 過濾後的圖片
     private string _currentFolderPath = string.Empty;
+
+    // 篩選條件
+    private string _selectedFormat = "All";
+    private int _selectedSizeIndex = 0; // 0=All, 1=<1MB, 2=1-10MB, 3=>10MB
+    private int _selectedDateIndex = 0; // 0=All, 1=Today, 2=This Week, 3=This Month
+
+    public string SelectedFormat
+    {
+        get => _selectedFormat;
+        set
+        {
+            if (_selectedFormat != value)
+            {
+                _selectedFormat = value;
+                ApplyFilters();
+            }
+        }
+    }
+
+    public int SelectedSizeIndex
+    {
+        get => _selectedSizeIndex;
+        set
+        {
+            if (_selectedSizeIndex != value)
+            {
+                _selectedSizeIndex = value;
+                ApplyFilters();
+            }
+        }
+    }
+
+    public int SelectedDateIndex
+    {
+        get => _selectedDateIndex;
+        set
+        {
+            if (_selectedDateIndex != value)
+            {
+                _selectedDateIndex = value;
+                ApplyFilters();
+            }
+        }
+    }
 
     private System.Windows.Threading.DispatcherTimer? _memoryUpdateTimer;
     private PhotoViewer.App.Controls.VirtualizingWrapPanel? _virtualizingPanel;
@@ -113,6 +158,22 @@ public partial class MainWindow : Window
         _themeService.ToggleTheme();
     }
 
+    private void SidebarToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (SidebarToggleButton.IsChecked == true)
+        {
+            // Expand
+            var sb = (System.Windows.Media.Animation.Storyboard)FindResource("SidebarExpandStoryboard");
+            sb.Begin();
+        }
+        else
+        {
+            // Collapse
+            var sb = (System.Windows.Media.Animation.Storyboard)FindResource("SidebarCollapseStoryboard");
+            sb.Begin();
+        }
+    }
+
     /// <summary>
     /// 載入檔案夾中的所有圖片
     /// </summary>
@@ -179,15 +240,16 @@ public partial class MainWindow : Window
                     Console.WriteLine($"Error processing file {path}: {ex.Message}");
                 }
             }
-            _currentImages = items;
+            _allImages = items;
 
             // 更新 UI
             FolderPathTextBlock.Text = folderPath;
-            ImageCountTextBlock.Text = $"共 {_currentImages.Count} 張圖片";
-            StatusTextBlock.Text = $"已載入 {_currentImages.Count} 張圖片";
+            
+            // 應用篩選
+            ApplyFilters();
 
             // 顯示縮圖
-            ImageListBox.ItemsSource = _currentImages;
+            ImageListBox.ItemsSource = FilteredImages;
 
             // 訂閱預載入事件（僅執行一次）
             if (_virtualizingPanel == null)
@@ -231,6 +293,61 @@ public partial class MainWindow : Window
         return imageFiles;
     }
 
+    private void Window_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            if (files != null && files.Length > 0)
+            {
+                var path = files[0];
+                if (Directory.Exists(path))
+                {
+                    _ = LoadFolderAsync(path);
+                }
+                else if (File.Exists(path))
+                {
+                    // If it's a file, load parent folder and scroll to it (TODO)
+                    var folder = Path.GetDirectoryName(path);
+                    if (!string.IsNullOrEmpty(folder))
+                    {
+                        _ = LoadFolderAsync(folder);
+                    }
+                }
+            }
+        }
+    }
+
+    private void OpenInExplorer_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement element && element.DataContext is ImageItem item)
+        {
+             try
+             {
+                 System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{item.FilePath}\"");
+             }
+             catch (Exception ex)
+             {
+                 MessageBox.Show($"無法開啟檔案總管: {ex.Message}");
+             }
+        }
+    }
+
+    private void CopyPath_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement element && element.DataContext is ImageItem item)
+        {
+            try
+            {
+                Clipboard.SetText(item.FilePath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"無法複製路徑: {ex.Message}");
+            }
+        }
+    }
+
     /// <summary>
     /// 縮圖點擊事件
     /// </summary>
@@ -243,10 +360,10 @@ public partial class MainWindow : Window
         {
             if (sender is FrameworkElement element && element.DataContext is ImageItem clickedImage)
             {
-                var index = _currentImages.IndexOf(clickedImage);
+                var index = FilteredImages.IndexOf(clickedImage);
                 if (index >= 0)
                 {
-                    var viewerWindow = new ViewerView(_currentImages, index);
+                    var viewerWindow = new ViewerView(FilteredImages.ToList(), index);
                     viewerWindow.Show();
                 }
             }
@@ -332,9 +449,9 @@ public partial class MainWindow : Window
     /// </summary>
     private void OnPreloadRequested(object? sender, PhotoViewer.App.Controls.PreloadRequestEventArgs e)
     {
-        if (_imageLoader == null || _currentImages.Count == 0) return;
+        if (_imageLoader == null || FilteredImages.Count == 0) return;
 
-        var filePaths = _currentImages
+        var filePaths = FilteredImages
             .Skip(e.StartIndex)
             .Take(e.Count)
             .Select(img => img.FilePath)
@@ -378,5 +495,64 @@ public partial class MainWindow : Window
             _imageLoader.LoadingStatusChanged -= OnLoadingStatusChanged;
             _imageLoader.Dispose();
         }
+    }
+
+
+    /// <summary>
+    /// 應用篩選條件
+    /// </summary>
+    private void ApplyFilters()
+    {
+        if (_allImages == null) return;
+
+        var query = _allImages.AsEnumerable();
+
+        // 1. 格式篩選
+        if (!string.IsNullOrEmpty(SelectedFormat) && SelectedFormat != "All")
+        {
+            query = query.Where(img => img.Format.Equals(SelectedFormat, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // 2. 大小篩選
+        switch (SelectedSizeIndex)
+        {
+            case 1: // < 1MB
+                query = query.Where(img => img.FileSize < 1024 * 1024);
+                break;
+            case 2: // 1 - 10MB
+                query = query.Where(img => img.FileSize >= 1024 * 1024 && img.FileSize <= 10 * 1024 * 1024);
+                break;
+            case 3: // > 10MB
+                query = query.Where(img => img.FileSize > 10 * 1024 * 1024);
+                break;
+        }
+
+        // 3. 日期篩選
+        var now = DateTime.Now;
+        switch (SelectedDateIndex)
+        {
+            case 1: // Today
+                query = query.Where(img => img.Modified.Date == now.Date);
+                break;
+            case 2: // This Week
+                var startOfWeek = now.Date.AddDays(-(int)now.DayOfWeek);
+                query = query.Where(img => img.Modified >= startOfWeek);
+                break;
+            case 3: // This Month
+                var startOfMonth = new DateTime(now.Year, now.Month, 1);
+                query = query.Where(img => img.Modified >= startOfMonth);
+                break;
+        }
+
+        // 更新 FilteredImages
+        FilteredImages.Clear();
+        foreach (var item in query)
+        {
+            FilteredImages.Add(item);
+        }
+
+        // 更新狀態列
+        ImageCountTextBlock.Text = $"共 {FilteredImages.Count} 張圖片 (總計 {_allImages.Count})";
+        StatusTextBlock.Text = $"已篩選 {FilteredImages.Count} 張圖片";
     }
 }

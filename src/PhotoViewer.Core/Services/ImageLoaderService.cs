@@ -189,6 +189,14 @@ public class ImageLoaderService : IDisposable
     }
 
     /// <summary>
+    /// 取得結構化的 EXIF 資訊
+    /// </summary>
+    public async Task<ExifInfo> GetExifInfoAsync(string filePath, CancellationToken ct = default)
+    {
+        return await Task.Run(() => _decoderService.GetExifInfo(filePath), ct);
+    }
+
+    /// <summary>
     /// 批次載入縮圖（高效能版本，充分利用所有 CPU 核心）
     /// </summary>
     public async Task<List<(string FilePath, SKBitmap? Bitmap)>> LoadThumbnailBatchAsync(

@@ -11,6 +11,7 @@
     <Color x:Key="PressedColor">#FF00D9F0</Color>
     <Color x:Key="SelectedColor">#FF0F1930</Color>
     <Color x:Key="SelectedBorderColor">#FF00F0FF</Color>
+    <Color x:Key="ShadowColor">#FF00F0FF</Color>
 
     <!-- Cyberpunk Neon Colors -->
     <Color x:Key="NeonCyanColor">#FF00F0FF</Color>
@@ -34,16 +35,43 @@
     <SolidColorBrush x:Key="NeonMagentaBrush" Color="{StaticResource NeonMagentaColor}"/>
     <SolidColorBrush x:Key="NeonPinkBrush" Color="{StaticResource NeonPinkColor}"/>
     <SolidColorBrush x:Key="NeonPurpleBrush" Color="{StaticResource NeonPurpleColor}"/>
+    <SolidColorBrush x:Key="NeonYellowBrush" Color="{StaticResource NeonYellowColor}"/>
+
+    <!-- Button Brushes -->
+    <SolidColorBrush x:Key="ButtonBackgroundBrush" Color="#FF0F1419"/>
+    <LinearGradientBrush x:Key="ButtonHoverBackgroundBrush" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF1A2A3F" Offset="0"/>
+        <GradientStop Color="#FF0F1930" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="ButtonPressedBackgroundBrush" Color="#FF0A0E27"/>
 
     <!-- Cyberpunk Gradient Brushes -->
-    <LinearGradientBrush x:Key="CyberpunkGradient" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#FF00F0FF" Offset="0"/>
-        <GradientStop Color="#FFBB00FF" Offset="0.5"/>
-        <GradientStop Color="#FFFF006E" Offset="1"/>
+    <LinearGradientBrush x:Key="MainToolbarGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#00F0FF" Offset="0"/>
+        <GradientStop Color="#BB00FF" Offset="0.5"/>
+        <GradientStop Color="#FF006E" Offset="1"/>
     </LinearGradientBrush>
 
-    <LinearGradientBrush x:Key="NeonBorderGradient" StartPoint="0,0" EndPoint="1,0">
-        <GradientStop Color="#FF00F0FF" Offset="0"/>
-        <GradientStop Color="#FFFF00FF" Offset="1"/>
+    <LinearGradientBrush x:Key="StatusToolbarBackgroundGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF0A0E27" Offset="0"/>
+        <GradientStop Color="#FF0F1419" Offset="0.5"/>
+        <GradientStop Color="#FF0A0E27" Offset="1"/>
     </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="StatusToolbarBorderGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#00F0FF" Offset="0"/>
+        <GradientStop Color="#FF006E" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- Empty State Gradients -->
+    <LinearGradientBrush x:Key="EmptyStateBorderGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#00F0FF" Offset="0"/>
+        <GradientStop Color="#FF006E" Offset="1"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="SelectionBackgroundGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#150F1930" Offset="0"/>
+        <GradientStop Color="#300F1930" Offset="1"/>
+    </LinearGradientBrush>
+
 </ResourceDictionary>
