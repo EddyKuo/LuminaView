@@ -15,6 +15,31 @@
         KeyDown="Window_KeyDown"
         Topmost="True">
 
+    <Window.Triggers>
+        <EventTrigger RoutedEvent="Loaded">
+            <BeginStoryboard>
+                <Storyboard>
+                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.3"/>
+                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="0.9" To="1" Duration="0:0:0.3">
+                        <DoubleAnimation.EasingFunction>
+                            <CubicEase EasingMode="EaseOut"/>
+                        </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="0.9" To="1" Duration="0:0:0.3">
+                        <DoubleAnimation.EasingFunction>
+                            <CubicEase EasingMode="EaseOut"/>
+                        </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                </Storyboard>
+            </BeginStoryboard>
+        </EventTrigger>
+    </Window.Triggers>
+
+    <Window.RenderTransformOrigin>0.5,0.5</Window.RenderTransformOrigin>
+    <Window.RenderTransform>
+        <ScaleTransform ScaleX="1" ScaleY="1"/>
+    </Window.RenderTransform>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -26,61 +51,79 @@
         <Border Grid.Row="0" Background="{DynamicResource SurfaceBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="10,8">
             <StackPanel Orientation="Horizontal">
                 <Button x:Name="PreviousButton"
-                        Content="◀ 上一張"
                         Padding="15,8"
                         Margin="0,0,5,0"
                         Click="PreviousButton_Click"
-                        Style="{StaticResource ModernButtonStyle}"/>
+                        Style="{StaticResource ModernButtonStyle}"
+                        ToolTip="上一張">
+                    <Path Data="{StaticResource Icon_Previous}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform"/>
+                </Button>
 
                 <Button x:Name="NextButton"
-                        Content="下一張 ▶"
                         Padding="15,8"
                         Margin="0,0,20,0"
                         Click="NextButton_Click"
-                        Style="{StaticResource ModernButtonStyle}"/>
+                        Style="{StaticResource ModernButtonStyle}"
+                        ToolTip="下一張">
+                    <Path Data="{StaticResource Icon_Next}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform"/>
+                </Button>
 
                 <Button x:Name="SlideshowButton"
-                        Content="▶ 播放"
                         Padding="15,8"
                         Margin="0,0,20,0"
                         Click="SlideshowButton_Click"
                         Style="{StaticResource ModernButtonStyle}"
-                        ToolTip="幻燈片播放 (F5)"/>
+                        ToolTip="幻燈片播放 (F5)">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource Icon_Play}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0"/>
+                        <TextBlock Text="播放"/>
+                    </StackPanel>
+                </Button>
 
                 <Button x:Name="FitButton"
-                        Content="🔲 適應視窗"
                         Padding="12,8"
                         Margin="0,0,5,0"
                         Click="FitButton_Click"
-                        Style="{StaticResource ModernButtonStyle}"/>
+                        Style="{StaticResource ModernButtonStyle}"
+                        ToolTip="適應視窗">
+                     <Path Data="{StaticResource Icon_Fit}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform"/>
+                </Button>
 
                 <Button x:Name="ActualSizeButton"
-                        Content="⊡ 實際大小"
                         Padding="12,8"
                         Margin="0,0,5,0"
                         Click="ActualSizeButton_Click"
-                        Style="{StaticResource ModernButtonStyle}"/>
+                        Style="{StaticResource ModernButtonStyle}"
+                        ToolTip="實際大小">
+                    <Path Data="{StaticResource Icon_Original}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform"/>
+                </Button>
 
                 <Button x:Name="RotateLeftButton"
-                        Content="↶ 左轉"
                         Padding="12,8"
                         Margin="0,0,5,0"
                         Click="RotateLeftButton_Click"
-                        Style="{StaticResource ModernButtonStyle}"/>
+                        Style="{StaticResource ModernButtonStyle}"
+                        ToolTip="左轉">
+                    <Path Data="{StaticResource Icon_RotateLeft}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform"/>
+                </Button>
 
                 <Button x:Name="RotateRightButton"
-                        Content="↷ 右轉"
                         Padding="12,8"
                         Margin="0,0,5,0"
                         Click="RotateRightButton_Click"
-                        Style="{StaticResource ModernButtonStyle}"/>
+                        Style="{StaticResource ModernButtonStyle}"
+                        ToolTip="右轉">
+                    <Path Data="{StaticResource Icon_RotateRight}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform"/>
+                </Button>
 
                 <Button x:Name="InfoButton"
-                        Content="ℹ 資訊"
                         Padding="12,8"
                         Margin="0,0,20,0"
                         Click="InfoButton_Click"
-                        Style="{StaticResource ModernButtonStyle}"/>
+                        Style="{StaticResource ModernButtonStyle}"
+                        ToolTip="資訊">
+                    <Path Data="{StaticResource Icon_Info}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform"/>
+                </Button>
 
                 <TextBlock x:Name="ImageInfoTextBlock"
                           Text=""

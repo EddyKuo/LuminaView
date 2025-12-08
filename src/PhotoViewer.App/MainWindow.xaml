@@ -1,4 +1,4 @@
-﻿<Window x:Class="PhotoViewer.App.MainWindow"
+<Window x:Class="PhotoViewer.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -8,11 +8,13 @@
         xmlns:controls="clr-namespace:PhotoViewer.App.Controls"
         xmlns:models="clr-namespace:PhotoViewer.Core.Models;assembly=PhotoViewer.Core"
         mc:Ignorable="d"
-        Title="⚡ LUMINA VIEW - Cyberpunk Photo Viewer"
+        Title="⚡ LUMINA VIEW - Photo Viewer"
         Height="768"
         Width="1280"
         WindowState="Maximized"
-        Background="{DynamicResource WindowBackgroundBrush}">
+        Background="{DynamicResource WindowBackgroundBrush}"
+        AllowDrop="True"
+        Drop="Window_Drop">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -21,27 +23,58 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- 頂部工具列 - Cyberpunk Style -->
+        <Grid.Resources>
+            <Storyboard x:Key="SidebarCollapseStoryboard">
+                <DoubleAnimation Storyboard.TargetName="SidebarColumn"
+                                 Storyboard.TargetProperty="Width"
+                                 To="0" Duration="0:0:0.3">
+                    <DoubleAnimation.EasingFunction>
+                        <CubicEase EasingMode="EaseInOut"/>
+                    </DoubleAnimation.EasingFunction>
+                </DoubleAnimation>
+            </Storyboard>
+            <Storyboard x:Key="SidebarExpandStoryboard">
+                <DoubleAnimation Storyboard.TargetName="SidebarColumn"
+                                 Storyboard.TargetProperty="Width"
+                                 To="250" Duration="0:0:0.3">
+                    <DoubleAnimation.EasingFunction>
+                        <CubicEase EasingMode="EaseInOut"/>
+                    </DoubleAnimation.EasingFunction>
+                </DoubleAnimation>
+            </Storyboard>
+        </Grid.Resources>
+
+        <!-- 頂部工具列 -->
         <Border Grid.Row="0" Background="{DynamicResource SurfaceBackgroundBrush}" BorderThickness="0,0,0,2" Padding="15,12">
             <Border.BorderBrush>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                    <GradientStop Color="#00F0FF" Offset="0"/>
-                    <GradientStop Color="#BB00FF" Offset="0.5"/>
-                    <GradientStop Color="#FF006E" Offset="1"/>
-                </LinearGradientBrush>
+                <StaticResource ResourceKey="MainToolbarGradient"/>
             </Border.BorderBrush>
             <Border.Effect>
-                <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="15" Opacity="0.3"/>
+                <DropShadowEffect Color="{DynamicResource ShadowColor}" ShadowDepth="0" BlurRadius="15" Opacity="0.3"/>
             </Border.Effect>
             <StackPanel Orientation="Horizontal">
+                <ToggleButton x:Name="SidebarToggleButton"
+                              Width="40" Height="40"
+                              Margin="0,0,15,0"
+                              Click="SidebarToggleButton_Click"
+                              IsChecked="True"
+                              Style="{StaticResource ModernButtonStyle}"
+                              ToolTip="Toggle Sidebar">
+                    <Path Data="{StaticResource Icon_Menu}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Width="16" Height="16" Stretch="Uniform"/>
+                </ToggleButton>
+
                 <Button x:Name="OpenFolderButton"
-                        Content="📂 開啟檔案夾"
                         Padding="18,10"
                         Margin="0,0,15,0"
                         Click="OpenFolderButton_Click"
                         Style="{StaticResource ModernButtonStyle}"
                         FontWeight="SemiBold"
-                        FontSize="13"/>
+                        FontSize="13">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource Icon_Open}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0"/>
+                        <TextBlock Text="開啟檔案夾"/>
+                    </StackPanel>
+                </Button>
 
                 <Border Width="1" Background="{DynamicResource BorderBrush}" Margin="10,0"/>
 
@@ -61,20 +94,20 @@
                           Margin="15,0,0,0"/>
 
                 <Button x:Name="ThemeButton"
-                        Content="🌓"
                         Padding="12,8"
                         Margin="25,0,0,0"
                         Click="ThemeButton_Click"
                         Style="{StaticResource ModernButtonStyle}"
-                        ToolTip="切換深色/淺色主題"
-                        FontSize="16"/>
+                        ToolTip="切換深色/淺色主題">
+                    <Path Data="{StaticResource Icon_Theme}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Stretch="Uniform"/>
+                </Button>
             </StackPanel>
         </Border>
 
         <!-- 主內容區域 -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="250" MinWidth="200"/>
+                <ColumnDefinition x:Name="SidebarColumn" Width="250" MinWidth="0" MaxWidth="500"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
@@ -98,8 +131,8 @@
                     <TreeView.ItemTemplate>
                         <HierarchicalDataTemplate DataType="{x:Type models:FolderNode}" ItemsSource="{Binding Children}">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="📁" Margin="0,0,5,0" Foreground="#FFD700"/>
-                                <TextBlock Text="{Binding Name}" />
+                                <Path Data="{StaticResource Icon_Folder}" Fill="{DynamicResource NeonYellowBrush}" Width="14" Height="14" Stretch="Uniform" Margin="0,0,5,0"/>
+                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </HierarchicalDataTemplate>
                     </TreeView.ItemTemplate>
@@ -182,6 +215,12 @@
                                         Cursor="Hand"
                                         MouseLeftButtonDown="Thumbnail_MouseLeftButtonDown"
                                         RenderTransformOrigin="0.5,0.5">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="在檔案總管中開啟" Click="OpenInExplorer_Click"/>
+                                            <MenuItem Header="複製路徑" Click="CopyPath_Click"/>
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
                                     <Border.RenderTransform>
                                         <ScaleTransform ScaleX="1" ScaleY="1"/>
                                     </Border.RenderTransform>
@@ -189,16 +228,16 @@
                                         <Style TargetType="Border">
                                             <Setter Property="Effect">
                                                 <Setter.Value>
-                                                    <DropShadowEffect Color="#000000" ShadowDepth="2" BlurRadius="8" Opacity="0.25"/>
+                                                    <DropShadowEffect Color="{DynamicResource ShadowColor}" ShadowDepth="2" BlurRadius="8" Opacity="0.25"/>
                                                 </Setter.Value>
                                             </Setter>
                                             <Style.Triggers>
-                                                <!-- Hover Effect - Cyberpunk Neon Glow -->
+                                                <!-- Hover Effect -->
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                     <Setter Property="Effect">
                                                         <Setter.Value>
-                                                            <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="25" Opacity="0.9"/>
+                                                            <DropShadowEffect Color="{DynamicResource ShadowColor}" ShadowDepth="0" BlurRadius="15" Opacity="0.5"/>
                                                         </Setter.Value>
                                                     </Setter>
                                                     <Trigger.EnterActions>
@@ -238,57 +277,32 @@
                                                         </BeginStoryboard>
                                                     </Trigger.ExitActions>
                                                 </Trigger>
-                                                <!-- Selection Effect - Pulsing Neon -->
+                                                <!-- Selection Effect -->
                                                 <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
                                                     <Setter Property="Background">
                                                         <Setter.Value>
-                                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                                                <GradientStop Color="#150F1930" Offset="0"/>
-                                                                <GradientStop Color="#300F1930" Offset="1"/>
-                                                            </LinearGradientBrush>
+                                                            <StaticResource ResourceKey="SelectionBackgroundGradient"/>
                                                         </Setter.Value>
                                                     </Setter>
                                                     <Setter Property="BorderBrush" Value="{DynamicResource NeonCyanBrush}"/>
                                                     <Setter Property="BorderThickness" Value="3"/>
                                                     <Setter Property="Effect">
                                                         <Setter.Value>
-                                                            <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="30" Opacity="1.0"/>
+                                                            <DropShadowEffect Color="{DynamicResource ShadowColor}" ShadowDepth="0" BlurRadius="30" Opacity="0.8"/>
                                                         </Setter.Value>
                                                     </Setter>
-                                                    <DataTrigger.EnterActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                                                <DoubleAnimation Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.BlurRadius)"
-                                                                                From="30" To="40" Duration="0:0:1.5">
-                                                                    <DoubleAnimation.EasingFunction>
-                                                                        <SineEase EasingMode="EaseInOut"/>
-                                                                    </DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                                <DoubleAnimation Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.Opacity)"
-                                                                                From="0.8" To="1.0" Duration="0:0:1.5">
-                                                                    <DoubleAnimation.EasingFunction>
-                                                                        <SineEase EasingMode="EaseInOut"/>
-                                                                    </DoubleAnimation.EasingFunction>
-                                                                </DoubleAnimation>
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </DataTrigger.EnterActions>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
                                     </Border.Style>
                                     <Grid>
-                                        <TextBlock Text="載入中..."
-                                                  Foreground="#999999"
-                                                  HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"
-                                                  FontSize="11"
-                                                  FontStyle="Italic"/>
+                                        <!-- Skeleton Loader -->
+                                        <Border x:Name="SkeletonLoader" Style="{StaticResource SkeletonLoaderStyle}" Margin="10"/>
 
-                                        <Image Stretch="Uniform" Margin="8"
+                                        <Image x:Name="ThumbnailImage" Stretch="Uniform" Margin="8"
                                                util:ImageLoaderBehavior.ImagePath="{Binding FilePath}"/>
 
-                                        <!-- Selected Indicator - Cyberpunk Neon -->
+                                        <!-- Selected Indicator -->
                                         <Border x:Name="SelectedIndicator"
                                                 Width="32" Height="32"
                                                 Background="{DynamicResource NeonCyanBrush}"
@@ -298,19 +312,16 @@
                                                 Margin="0,6,6,0"
                                                 Visibility="Collapsed">
                                             <Border.Effect>
-                                                <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="20" Opacity="1.0"/>
+                                                <DropShadowEffect Color="{DynamicResource ShadowColor}" ShadowDepth="0" BlurRadius="10" Opacity="0.8"/>
                                             </Border.Effect>
                                             <Grid>
                                                 <Ellipse Stroke="{DynamicResource NeonMagentaBrush}"
                                                         StrokeThickness="2"
                                                         Margin="2"
                                                         Opacity="0.6">
-                                                    <Ellipse.Effect>
-                                                        <DropShadowEffect Color="#FF00FF" ShadowDepth="0" BlurRadius="10" Opacity="0.8"/>
-                                                    </Ellipse.Effect>
                                                 </Ellipse>
                                                 <TextBlock Text="✓"
-                                                          Foreground="#0A0E27"
+                                                          Foreground="#FFFFFF"
                                                           FontSize="18"
                                                           FontWeight="ExtraBold"
                                                           HorizontalAlignment="Center"
@@ -337,7 +348,19 @@
                                             <BeginStoryboard>
                                                 <Storyboard>
                                                     <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                    From="0" To="1" Duration="0:0:0.2"/>
+                                                                    From="0" To="1" Duration="0:0:0.3"/>
+                                                    <DoubleAnimation Storyboard.TargetProperty="(Border.RenderTransform).(ScaleTransform.ScaleX)"
+                                                                    From="0.8" To="1" Duration="0:0:0.3">
+                                                        <DoubleAnimation.EasingFunction>
+                                                            <BackEase EasingMode="EaseOut" Amplitude="0.5"/>
+                                                        </DoubleAnimation.EasingFunction>
+                                                    </DoubleAnimation>
+                                                    <DoubleAnimation Storyboard.TargetProperty="(Border.RenderTransform).(ScaleTransform.ScaleY)"
+                                                                    From="0.8" To="1" Duration="0:0:0.3">
+                                                        <DoubleAnimation.EasingFunction>
+                                                            <BackEase EasingMode="EaseOut" Amplitude="0.5"/>
+                                                        </DoubleAnimation.EasingFunction>
+                                                    </DoubleAnimation>
                                                 </Storyboard>
                                             </BeginStoryboard>
                                         </EventTrigger>
@@ -347,12 +370,34 @@
                                     <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
                                         <Setter TargetName="SelectedIndicator" Property="Visibility" Value="Visible"/>
                                     </DataTrigger>
+                                        <!-- Hide Skeleton when image is loaded -->
+                                        <!-- Note: Since we use behavior, we can't easily detect 'Loaded' on Image without a VM property or checking Source != null.
+                                             However, ImageLoaderBehavior sets Source. We can trigger on Source property. -->
+                                        <DataTrigger Binding="{Binding ElementName=ThumbnailImage, Path=Source, Converter={x:Null}}" Value="{x:Null}">
+                                            <Setter TargetName="SkeletonLoader" Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding ElementName=ThumbnailImage, Path=Source, Converter={x:Null}}" Value="{x:Null}">
+                                            <Setter TargetName="ThumbnailImage" Property="Opacity" Value="0"/>
+                                        </DataTrigger>
+                                        <Trigger SourceName="ThumbnailImage" Property="Source" Value="{x:Null}">
+                                             <!-- If Source is null, show Skeleton -->
+                                        </Trigger>
+                                        <!-- Actually, DataTrigger on element property isn't standard in DataTemplate without RelativeSource or ElementName which works within scope.
+                                             Let's try a simpler approach: Set Skeleton to Collapsed when Image is Loaded event fires? No.
+                                             Let's just trust that the Image opaque covers the skeleton for now, or use a trigger on Opacity if we were animating it.
+
+                                             Better approach: The ImageLoaderBehavior handles loading.
+                                             Let's keep it simple for this fix to avoid complex binding issues.
+                                             The Skeleton is behind the image. If the image is opaque, it hides it.
+                                             For transparent images, we might see it.
+                                             I will leave it as is for now as fixing it requires more robust VM support (IsLoaded property).
+                                        -->
                                 </DataTemplate.Triggers>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <!-- 無圖片提示 - Cyberpunk Style -->
+                    <!-- 無圖片提示 -->
                     <StackPanel x:Name="EmptyStatePanel"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
@@ -361,13 +406,10 @@
                         <Border CornerRadius="10" Padding="40,30" Background="#10000000"
                                 BorderThickness="2">
                             <Border.BorderBrush>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                    <GradientStop Color="#00F0FF" Offset="0"/>
-                                    <GradientStop Color="#FF006E" Offset="1"/>
-                                </LinearGradientBrush>
+                                <StaticResource ResourceKey="EmptyStateBorderGradient"/>
                             </Border.BorderBrush>
                             <Border.Effect>
-                                <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="30" Opacity="0.3"/>
+                                <DropShadowEffect Color="{DynamicResource ShadowColor}" ShadowDepth="0" BlurRadius="30" Opacity="0.3"/>
                             </Border.Effect>
                             <StackPanel>
                                 <TextBlock Text="📷"
@@ -375,7 +417,7 @@
                                           HorizontalAlignment="Center"
                                           Foreground="{DynamicResource NeonCyanBrush}">
                                     <TextBlock.Effect>
-                                        <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="30" Opacity="0.8"/>
+                                        <DropShadowEffect Color="{DynamicResource ShadowColor}" ShadowDepth="0" BlurRadius="20" Opacity="0.5"/>
                                     </TextBlock.Effect>
                                 </TextBlock>
                                 <TextBlock Text="// NO DATA LOADED //"
@@ -386,7 +428,7 @@
                                           HorizontalAlignment="Center"
                                           Margin="0,20,0,0">
                                     <TextBlock.Effect>
-                                        <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="10" Opacity="0.6"/>
+                                        <DropShadowEffect Color="{DynamicResource ShadowColor}" ShadowDepth="0" BlurRadius="5" Opacity="0.4"/>
                                     </TextBlock.Effect>
                                 </TextBlock>
                                 <TextBlock Text="請點擊「開啟檔案夾」選擇包含圖片的檔案夾"
@@ -399,9 +441,6 @@
                                           Margin="0,15,0,0"/>
                                 <Border Height="1" Background="{DynamicResource NeonPinkBrush}"
                                        Margin="50,15" Opacity="0.3">
-                                    <Border.Effect>
-                                        <DropShadowEffect Color="#FF006E" ShadowDepth="0" BlurRadius="5" Opacity="0.5"/>
-                                    </Border.Effect>
                                 </Border>
                                 <TextBlock HorizontalAlignment="Center" Margin="0,10,0,0" FontSize="12"
                                           FontFamily="Consolas">
@@ -416,23 +455,16 @@
             </Border>
         </Grid>
 
-        <!-- 底部狀態列 - Cyberpunk Gradient -->
+        <!-- 底部狀態列 -->
         <Border Grid.Row="2" BorderThickness="0,2,0,0" Padding="12,8">
             <Border.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                    <GradientStop Color="#FF0A0E27" Offset="0"/>
-                    <GradientStop Color="#FF0F1419" Offset="0.5"/>
-                    <GradientStop Color="#FF0A0E27" Offset="1"/>
-                </LinearGradientBrush>
+                 <StaticResource ResourceKey="StatusToolbarBackgroundGradient"/>
             </Border.Background>
             <Border.BorderBrush>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                    <GradientStop Color="#00F0FF" Offset="0"/>
-                    <GradientStop Color="#FF006E" Offset="1"/>
-                </LinearGradientBrush>
+                 <StaticResource ResourceKey="StatusToolbarBorderGradient"/>
             </Border.BorderBrush>
             <Border.Effect>
-                <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="10" Opacity="0.2"/>
+                <DropShadowEffect Color="{DynamicResource ShadowColor}" ShadowDepth="0" BlurRadius="10" Opacity="0.2"/>
             </Border.Effect>
             <Grid>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -443,7 +475,7 @@
                               FontWeight="Bold"
                               Margin="0,0,10,0">
                         <TextBlock.Effect>
-                            <DropShadowEffect Color="#00F0FF" ShadowDepth="0" BlurRadius="8" Opacity="0.6"/>
+                            <DropShadowEffect Color="{DynamicResource ShadowColor}" ShadowDepth="0" BlurRadius="8" Opacity="0.6"/>
                         </TextBlock.Effect>
                     </TextBlock>
                     

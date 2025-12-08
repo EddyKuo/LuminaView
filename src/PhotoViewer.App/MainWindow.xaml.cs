@@ -113,6 +113,22 @@ public partial class MainWindow : Window
         _themeService.ToggleTheme();
     }
 
+    private void SidebarToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (SidebarToggleButton.IsChecked == true)
+        {
+            // Expand
+            var sb = (System.Windows.Media.Animation.Storyboard)FindResource("SidebarExpandStoryboard");
+            sb.Begin();
+        }
+        else
+        {
+            // Collapse
+            var sb = (System.Windows.Media.Animation.Storyboard)FindResource("SidebarCollapseStoryboard");
+            sb.Begin();
+        }
+    }
+
     /// <summary>
     /// 載入檔案夾中的所有圖片
     /// </summary>
@@ -229,6 +245,61 @@ public partial class MainWindow : Window
         }
 
         return imageFiles;
+    }
+
+    private void Window_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            if (files != null && files.Length > 0)
+            {
+                var path = files[0];
+                if (Directory.Exists(path))
+                {
+                    _ = LoadFolderAsync(path);
+                }
+                else if (File.Exists(path))
+                {
+                    // If it's a file, load parent folder and scroll to it (TODO)
+                    var folder = Path.GetDirectoryName(path);
+                    if (!string.IsNullOrEmpty(folder))
+                    {
+                        _ = LoadFolderAsync(folder);
+                    }
+                }
+            }
+        }
+    }
+
+    private void OpenInExplorer_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement element && element.DataContext is ImageItem item)
+        {
+             try
+             {
+                 System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{item.FilePath}\"");
+             }
+             catch (Exception ex)
+             {
+                 MessageBox.Show($"無法開啟檔案總管: {ex.Message}");
+             }
+        }
+    }
+
+    private void CopyPath_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement element && element.DataContext is ImageItem item)
+        {
+            try
+            {
+                Clipboard.SetText(item.FilePath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"無法複製路徑: {ex.Message}");
+            }
+        }
     }
 
     /// <summary>

@@ -1,15 +1,24 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Light Theme Color Palette -->
     <Color x:Key="WindowBackgroundColor">#FFFFFFFF</Color>
     <Color x:Key="SurfaceBackgroundColor">#FFF3F3F3</Color>
-    <Color x:Key="BorderColor">#FFCCCCCC</Color>
-    <Color x:Key="PrimaryTextColor">#FF000000</Color>
-    <Color x:Key="SecondaryTextColor">#FF555555</Color>
-    <Color x:Key="AccentColor">#FF007ACC</Color>
+    <Color x:Key="BorderColor">#FFDDDDDD</Color>
+    <Color x:Key="PrimaryTextColor">#FF222222</Color>
+    <Color x:Key="SecondaryTextColor">#FF666666</Color>
+    <Color x:Key="AccentColor">#FF0078D7</Color>
     <Color x:Key="HoverColor">#FFE5E5E5</Color>
     <Color x:Key="PressedColor">#FFCCE8FF</Color>
     <Color x:Key="SelectedColor">#FFE3F2FD</Color>
-    <Color x:Key="SelectedBorderColor">#FF1976D2</Color>
+    <Color x:Key="SelectedBorderColor">#FF0078D7</Color>
+    <Color x:Key="ShadowColor">#80000000</Color>
+
+    <!-- Mapped "Neon" Colors for Light Theme (Readable variants) -->
+    <Color x:Key="NeonCyanColor">#FF005A9E</Color>
+    <Color x:Key="NeonMagentaColor">#FF880088</Color>
+    <Color x:Key="NeonPinkColor">#FFD13438</Color>
+    <Color x:Key="NeonPurpleColor">#FF5C2D91</Color>
+    <Color x:Key="NeonYellowColor">#FFD83B01</Color> <!-- Using Orange/Red for better visibility on white -->
 
     <SolidColorBrush x:Key="WindowBackgroundBrush" Color="{StaticResource WindowBackgroundColor}"/>
     <SolidColorBrush x:Key="SurfaceBackgroundBrush" Color="{StaticResource SurfaceBackgroundColor}"/>
@@ -21,4 +30,46 @@
     <SolidColorBrush x:Key="PressedBrush" Color="{StaticResource PressedColor}"/>
     <SolidColorBrush x:Key="SelectedBrush" Color="{StaticResource SelectedColor}"/>
     <SolidColorBrush x:Key="SelectedBorderBrush" Color="{StaticResource SelectedBorderColor}"/>
+
+    <SolidColorBrush x:Key="NeonCyanBrush" Color="{StaticResource NeonCyanColor}"/>
+    <SolidColorBrush x:Key="NeonMagentaBrush" Color="{StaticResource NeonMagentaColor}"/>
+    <SolidColorBrush x:Key="NeonPinkBrush" Color="{StaticResource NeonPinkColor}"/>
+    <SolidColorBrush x:Key="NeonPurpleBrush" Color="{StaticResource NeonPurpleColor}"/>
+    <SolidColorBrush x:Key="NeonYellowBrush" Color="{StaticResource NeonYellowColor}"/>
+
+    <!-- Button Brushes -->
+    <SolidColorBrush x:Key="ButtonBackgroundBrush" Color="#FFF9F9F9"/>
+    <LinearGradientBrush x:Key="ButtonHoverBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#FFFFFFFF" Offset="0"/>
+        <GradientStop Color="#FFEFEFEF" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="ButtonPressedBackgroundBrush" Color="#FFE5F1FB"/>
+
+    <!-- Gradients -->
+    <LinearGradientBrush x:Key="MainToolbarGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF0078D7" Offset="0"/>
+        <GradientStop Color="#FF00B7C3" Offset="1"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="StatusToolbarBackgroundGradient" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#FFF3F3F3" Offset="0"/>
+        <GradientStop Color="#FFEFEFEF" Offset="1"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="StatusToolbarBorderGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#FF0078D7" Offset="0"/>
+        <GradientStop Color="#FF00B7C3" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- Empty State Gradients -->
+    <LinearGradientBrush x:Key="EmptyStateBorderGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#FF0078D7" Offset="0"/>
+        <GradientStop Color="#FF00B7C3" Offset="1"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="SelectionBackgroundGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#200078D7" Offset="0"/>
+        <GradientStop Color="#400078D7" Offset="1"/>
+    </LinearGradientBrush>
+
 </ResourceDictionary>
