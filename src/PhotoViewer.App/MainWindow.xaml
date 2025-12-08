@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:PhotoViewer.App"
         xmlns:util="clr-namespace:PhotoViewer.App.Utilities"
         xmlns:controls="clr-namespace:PhotoViewer.App.Controls"
+        xmlns:converters="clr-namespace:PhotoViewer.App.Converters"
         xmlns:models="clr-namespace:PhotoViewer.Core.Models;assembly=PhotoViewer.Core"
         mc:Ignorable="d"
         Title="⚡ LUMINA VIEW - Photo Viewer"
@@ -35,6 +36,10 @@
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
         </Storyboard>
+
+        <!-- Rating Converters -->
+        <converters:RatingToVisibilityConverter x:Key="RatingToVisibilityConverter"/>
+        <converters:RatingToStarsConverter x:Key="RatingToStarsConverter"/>
     </Window.Resources>
 
     <Grid>
@@ -213,6 +218,18 @@
                                     <ComboBoxItem Content="本月"/>
                                 </ComboBox>
                             </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="20,0,0,0">
+                                <TextBlock Text="評分:" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,0,8,0"/>
+                                <ComboBox x:Name="RatingFilterComboBox" Width="120" SelectedIndex="{Binding SelectedRatingIndex}" SelectionChanged="RatingFilter_SelectionChanged">
+                                    <ComboBoxItem Content="全部"/>
+                                    <ComboBoxItem Content="★★★★★"/>
+                                    <ComboBoxItem Content="★★★★☆ 以上"/>
+                                    <ComboBoxItem Content="★★★☆☆ 以上"/>
+                                    <ComboBoxItem Content="已評分"/>
+                                    <ComboBoxItem Content="未評分"/>
+                                </ComboBox>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
@@ -275,6 +292,16 @@
                                         <ContextMenu>
                                             <MenuItem Header="在檔案總管中開啟" Click="OpenInExplorer_Click"/>
                                             <MenuItem Header="複製路徑" Click="CopyPath_Click"/>
+                                            <Separator/>
+                                            <MenuItem Header="⭐ 評分">
+                                                <MenuItem Header="★★★★★ (5)" Click="SetRating_Click" Tag="5"/>
+                                                <MenuItem Header="★★★★☆ (4)" Click="SetRating_Click" Tag="4"/>
+                                                <MenuItem Header="★★★☆☆ (3)" Click="SetRating_Click" Tag="3"/>
+                                                <MenuItem Header="★★☆☆☆ (2)" Click="SetRating_Click" Tag="2"/>
+                                                <MenuItem Header="★☆☆☆☆ (1)" Click="SetRating_Click" Tag="1"/>
+                                                <Separator/>
+                                                <MenuItem Header="清除評分" Click="SetRating_Click" Tag="0"/>
+                                            </MenuItem>
                                         </ContextMenu>
                                     </Border.ContextMenu>
                                     <Border.RenderTransform>
@@ -383,6 +410,28 @@
                                                           HorizontalAlignment="Center"
                                                           VerticalAlignment="Center"/>
                                             </Grid>
+                                        </Border>
+
+                                        <!-- Star Rating Indicator -->
+                                        <Border VerticalAlignment="Top"
+                                                HorizontalAlignment="Left"
+                                                Background="#AA000000"
+                                                CornerRadius="0,0,6,0"
+                                                Padding="4,2"
+                                                Visibility="{Binding Rating, Converter={StaticResource RatingToVisibilityConverter}}">
+                                            <ItemsControl ItemsSource="{Binding Rating, Converter={StaticResource RatingToStarsConverter}}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Path Data="{StaticResource Icon_Star}" 
+                                                              Fill="#FFD700" Width="10" Height="10" Stretch="Uniform" Margin="0,0,1,0"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
                                         </Border>
 
                                         <!-- Filename Overlay -->

@@ -65,4 +65,9 @@ public class ImageItem
     /// 結構化的 EXIF 資訊
     /// </summary>
     public ExifInfo? Exif { get; set; }
+
+    /// <summary>
+    /// 圖片評分 (0-5 星, 0 表示未評分)
+    /// </summary>
+    public int Rating { get; set; } = 0;
 }

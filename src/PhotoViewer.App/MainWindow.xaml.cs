@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private ImageLoaderService? _imageLoader;
     private readonly FileWatcherService _fileWatcher;
     private readonly Services.ThemeService _themeService;
+    private readonly RatingService _ratingService;
     private List<ImageItem> _allImages = new(); // 所有圖片
     public ObservableCollection<ImageItem> FilteredImages { get; private set; } = new(); // 過濾後的圖片
     private string _currentFolderPath = string.Empty;
@@ -27,6 +28,7 @@ public partial class MainWindow : Window
     private string _selectedFormat = "All";
     private int _selectedSizeIndex = 0; // 0=All, 1=<1MB, 2=1-10MB, 3=>10MB
     private int _selectedDateIndex = 0; // 0=All, 1=Today, 2=This Week, 3=This Month
+    private int _selectedRatingIndex = 0; // 0=All, 1=5星, 2=4+星, 3=3+星, 4=已評分, 5=未評分
 
     public string SelectedFormat
     {
@@ -67,6 +69,19 @@ public partial class MainWindow : Window
         }
     }
 
+    public int SelectedRatingIndex
+    {
+        get => _selectedRatingIndex;
+        set
+        {
+            if (_selectedRatingIndex != value)
+            {
+                _selectedRatingIndex = value;
+                ApplyFilters();
+            }
+        }
+    }
+
     private System.Windows.Threading.DispatcherTimer? _memoryUpdateTimer;
     private PhotoViewer.App.Controls.VirtualizingWrapPanel? _virtualizingPanel;
 
@@ -82,6 +97,7 @@ public partial class MainWindow : Window
             // _imageLoader = new ImageLoaderService();
             _fileWatcher = new FileWatcherService();
             _themeService = new Services.ThemeService();
+            _ratingService = new RatingService();
 
             // 訂閱檔案監控事件
             _fileWatcher.FileCreated += OnFileCreated;
@@ -241,6 +257,16 @@ public partial class MainWindow : Window
                 }
             }
             _allImages = items;
+
+            // 載入已儲存的評分
+            var savedRatings = _ratingService.GetRatings(items.Select(i => i.FilePath));
+            foreach (var item in _allImages)
+            {
+                if (savedRatings.TryGetValue(item.FilePath, out var rating))
+                {
+                    item.Rating = rating;
+                }
+            }
 
             // 更新 UI
             FolderPathTextBlock.Text = folderPath;
@@ -490,11 +516,58 @@ public partial class MainWindow : Window
     {
         _memoryUpdateTimer?.Stop();
         _fileWatcher.Dispose();
+        _ratingService.Dispose();
         if (_imageLoader != null)
         {
             _imageLoader.LoadingStatusChanged -= OnLoadingStatusChanged;
             _imageLoader.Dispose();
         }
+    }
+
+    /// <summary>
+    /// 設定圖片評分
+    /// </summary>
+    private void SetRating_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem menuItem && menuItem.Tag is string tagStr && int.TryParse(tagStr, out int rating))
+        {
+            // 從 ContextMenu 向上找到 ImageItem
+            var contextMenu = menuItem.Parent as ItemsControl;
+            while (contextMenu != null && !(contextMenu is ContextMenu))
+            {
+                contextMenu = contextMenu.Parent as ItemsControl;
+            }
+
+            if (contextMenu is ContextMenu cm && cm.PlacementTarget is FrameworkElement element)
+            {
+                if (element.DataContext is ImageItem item)
+                {
+                    // 更新評分
+                    item.Rating = rating;
+                    _ratingService.SetRating(item.FilePath, rating);
+
+                    // 強制刷新 UI
+                    var index = FilteredImages.IndexOf(item);
+                    if (index >= 0)
+                    {
+                        FilteredImages.RemoveAt(index);
+                        FilteredImages.Insert(index, item);
+                    }
+
+                    StatusTextBlock.Text = rating > 0 
+                        ? $"已設定 {item.FileName} 為 {rating} 星評分" 
+                        : $"已清除 {item.FileName} 的評分";
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 評分篩選變更
+    /// </summary>
+    private void RatingFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        ApplyFilters();
     }
 
 
@@ -541,6 +614,26 @@ public partial class MainWindow : Window
             case 3: // This Month
                 var startOfMonth = new DateTime(now.Year, now.Month, 1);
                 query = query.Where(img => img.Modified >= startOfMonth);
+                break;
+        }
+
+        // 4. 評分篩選
+        switch (SelectedRatingIndex)
+        {
+            case 1: // 5 星
+                query = query.Where(img => img.Rating == 5);
+                break;
+            case 2: // 4+ 星
+                query = query.Where(img => img.Rating >= 4);
+                break;
+            case 3: // 3+ 星
+                query = query.Where(img => img.Rating >= 3);
+                break;
+            case 4: // 已評分
+                query = query.Where(img => img.Rating > 0);
+                break;
+            case 5: // 未評分
+                query = query.Where(img => img.Rating == 0);
                 break;
         }
 
