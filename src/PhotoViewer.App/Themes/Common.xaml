@@ -104,22 +104,20 @@
             </Setter.Value>
         </Setter>
         <Setter Property="CornerRadius" Value="4"/>
-        <Setter Property="Triggers">
-            <Setter.Value>
-                <EventTrigger RoutedEvent="Loaded">
-                    <BeginStoryboard>
-                        <Storyboard RepeatBehavior="Forever">
-                            <DoubleAnimation Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.GradientStops)[1].Offset"
-                                             From="-1" To="2" Duration="0:0:1.5"/>
-                            <DoubleAnimation Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.GradientStops)[0].Offset"
-                                             From="-1.5" To="1.5" Duration="0:0:1.5"/>
-                            <DoubleAnimation Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.GradientStops)[2].Offset"
-                                             From="-0.5" To="2.5" Duration="0:0:1.5"/>
-                        </Storyboard>
-                    </BeginStoryboard>
-                </EventTrigger>
-            </Setter.Value>
-        </Setter>
+        <Style.Triggers>
+            <EventTrigger RoutedEvent="Loaded">
+                <BeginStoryboard>
+                    <Storyboard RepeatBehavior="Forever">
+                        <DoubleAnimation Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.GradientStops)[1].Offset"
+                                         From="-1" To="2" Duration="0:0:1.5"/>
+                        <DoubleAnimation Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.GradientStops)[0].Offset"
+                                         From="-1.5" To="1.5" Duration="0:0:1.5"/>
+                        <DoubleAnimation Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.GradientStops)[2].Offset"
+                                         From="-0.5" To="2.5" Duration="0:0:1.5"/>
+                    </Storyboard>
+                </BeginStoryboard>
+            </EventTrigger>
+        </Style.Triggers>
     </Style>
 
     <!-- Vector Icons -->
