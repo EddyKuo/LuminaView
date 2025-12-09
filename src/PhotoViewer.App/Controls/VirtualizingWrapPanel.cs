@@ -207,16 +207,44 @@ public class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
     private void CleanUpItems(int minIndex, int maxIndex)
     {
         var generator = ItemContainerGenerator;
+        if (generator == null) return;
+
+        // 確保 minIndex 和 maxIndex 是有效的
+        if (minIndex < 0) minIndex = 0;
 
         for (int i = InternalChildren.Count - 1; i >= 0; i--)
         {
             var container = InternalChildren[i];
-            var itemIndex = ((ItemContainerGenerator)generator).IndexFromContainer(container);
+            if (container == null) continue;
+
+            int itemIndex = -1;
+            try
+            {
+                itemIndex = ((ItemContainerGenerator)generator).IndexFromContainer(container);
+            }
+            catch
+            {
+                // 如果無法獲取索引，跳過此項目
+                continue;
+            }
 
             if (itemIndex < minIndex || itemIndex > maxIndex)
             {
-                RemoveInternalChildRange(i, 1);
-                generator.Remove(new GeneratorPosition(i, 0), 1);
+                try
+                {
+                    var genPos = generator.GeneratorPositionFromIndex(itemIndex);
+                    RemoveInternalChildRange(i, 1);
+                    generator.Remove(genPos, 1);
+                }
+                catch
+                {
+                    // 如果移除失敗，僅移除內部子項目
+                    try
+                    {
+                        RemoveInternalChildRange(i, 1);
+                    }
+                    catch { }
+                }
             }
         }
     }
