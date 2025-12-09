@@ -155,28 +155,27 @@
         </Setter>
     </Style>
 
-    <!-- Skeleton Loader Style -->
+    <!-- Skeleton Loader Style - Glowing Border Animation -->
     <Style x:Key="SkeletonLoaderStyle" TargetType="Border">
-        <Setter Property="Background">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource NeonCyanBrush}"/>
+        <Setter Property="Opacity" Value="0.6"/>
+        <Setter Property="Effect">
             <Setter.Value>
-                <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5" MappingMode="RelativeToBoundingBox">
-                    <GradientStop Color="#10FFFFFF" Offset="0"/>
-                    <GradientStop Color="#30FFFFFF" Offset="0.5"/>
-                    <GradientStop Color="#10FFFFFF" Offset="1"/>
-                </LinearGradientBrush>
+                <DropShadowEffect Color="#00D4FF" ShadowDepth="0" BlurRadius="8" Opacity="0.8"/>
             </Setter.Value>
         </Setter>
-        <Setter Property="CornerRadius" Value="4"/>
         <Style.Triggers>
             <EventTrigger RoutedEvent="Loaded">
                 <BeginStoryboard>
-                    <Storyboard RepeatBehavior="Forever">
-                        <DoubleAnimation Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.GradientStops)[1].Offset"
-                                         From="-1" To="2" Duration="0:0:1.5"/>
-                        <DoubleAnimation Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.GradientStops)[0].Offset"
-                                         From="-1.5" To="1.5" Duration="0:0:1.5"/>
-                        <DoubleAnimation Storyboard.TargetProperty="(Border.Background).(LinearGradientBrush.GradientStops)[2].Offset"
-                                         From="-0.5" To="2.5" Duration="0:0:1.5"/>
+                    <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                        <!-- Pulse glow effect -->
+                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                         From="0.3" To="0.9" Duration="0:0:0.8"/>
+                        <DoubleAnimation Storyboard.TargetProperty="(Border.Effect).(DropShadowEffect.BlurRadius)"
+                                         From="5" To="20" Duration="0:0:0.8"/>
                     </Storyboard>
                 </BeginStoryboard>
             </EventTrigger>
