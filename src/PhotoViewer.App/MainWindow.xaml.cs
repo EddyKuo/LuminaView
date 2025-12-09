@@ -191,6 +191,17 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// 載入指示器顯示開關
+    /// </summary>
+    public static bool IsLoadingIndicatorEnabled { get; set; } = true;
+
+    private void AnimationToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        IsLoadingIndicatorEnabled = AnimationToggleButton.IsChecked == true;
+        StatusTextBlock.Text = IsLoadingIndicatorEnabled ? "載入指示器已啟用" : "載入指示器已停用";
+    }
+
+    /// <summary>
     /// 載入檔案夾中的所有圖片
     /// </summary>
     private async Task LoadFolderAsync(string folderPath)
