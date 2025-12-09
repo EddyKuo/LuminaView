@@ -241,9 +241,9 @@
                                     <Trigger Property="IsMouseOver" Value="True">
                                         <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
                                     </Trigger>
-                                    <!-- 選中狀態 - 高對比度 -->
+                                    <!-- 選中狀態 - 深色背景確保對比度 -->
                                     <Trigger Property="IsSelected" Value="True">
-                                        <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                        <Setter Property="Background" Value="#FF1A3A5A"/>
                                         <Setter Property="Foreground" Value="White"/>
                                     </Trigger>
                                     <!-- 選中且無焦點 -->
