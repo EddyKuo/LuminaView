@@ -379,11 +379,11 @@
                                         </Style>
                                     </Border.Style>
                                     <Grid>
-                                        <!-- Skeleton Loader -->
-                                        <Border x:Name="SkeletonLoader" Style="{StaticResource SkeletonLoaderStyle}" Margin="10"/>
-
                                         <Image x:Name="ThumbnailImage" Stretch="Uniform" Margin="8"
                                                util:ImageLoaderBehavior.ImagePath="{Binding FilePath}"/>
+
+                                        <!-- Skeleton Loader - Glowing Border on top when loading -->
+                                        <Border x:Name="SkeletonLoader" Style="{StaticResource SkeletonLoaderStyle}" Margin="4"/>
 
                                         <!-- Selected Indicator -->
                                         <Border x:Name="SelectedIndicator"
