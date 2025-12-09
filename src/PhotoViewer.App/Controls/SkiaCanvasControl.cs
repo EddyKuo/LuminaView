@@ -46,11 +46,22 @@ public class SkiaCanvasControl : SKElement
             _currentBitmap = value;
             if (value != null)
             {
-                ResetTransform();
+                // 如果 Canvas 尺寸尚未確定，延遲置中
+                if (ActualWidth > 0 && ActualHeight > 0)
+                {
+                    ResetTransform();
+                }
+                else
+                {
+                    // 標記需要在 SizeChanged 時置中
+                    _needsCentering = true;
+                }
             }
             InvalidateVisual();
         }
     }
+
+    private bool _needsCentering = false;
 
     private PhotoViewer.Core.Models.AnimatedImage? _animatedImage;
     private System.Windows.Threading.DispatcherTimer? _animationTimer;
@@ -361,7 +372,19 @@ public class SkiaCanvasControl : SKElement
     {
         if (_currentBitmap != null)
         {
-            ResetTransform();
+            // 如果有延遲的置中需求，執行置中
+            if (_needsCentering)
+            {
+                _needsCentering = false;
+                ResetTransform();
+            }
+            else
+            {
+                // 大小改變時保持圖片置中
+                _translate = CalculateCenterPosition();
+                UpdateMatrix();
+                InvalidateVisual();
+            }
         }
     }
 
