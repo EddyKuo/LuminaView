@@ -1,24 +1,33 @@
 using SkiaSharp;
 using PhotoViewer.Core.Utilities;
 using PhotoViewer.Core.Models;
-using MetadataExtractor;
-using MetadataExtractor.Formats.Exif;
 using System.IO;
 
 namespace PhotoViewer.Core.Services;
 
 /// <summary>
-/// 圖片解碼服務（使用 SkiaSharp 與 LibRaw）
-/// LibRaw 用於 RAW 檔案，SkiaSharp 用於一般圖檔
+/// 圖片解碼服務
+/// 負責解碼各種圖片格式，包括 RAW 檔案
+/// 
+/// 支援的 RAW 格式由 ImageUtils.RawExtensions 定義
 /// 注意：Nikon Z9 HE/HE* 格式目前 LibRaw 不支援，需等待 LibRaw 更新
 /// </summary>
 public class ImageDecoderService
 {
+    #region Fields
+
     private readonly LibRawDecoder _libRawDecoder = new();
+    private readonly ExifService _exifService = new();
+
+    #endregion
+
+    #region Public Methods - Full Image Decoding
 
     /// <summary>
     /// 解碼完整圖片
     /// </summary>
+    /// <param name="filePath">圖片檔案路徑</param>
+    /// <returns>解碼後的 SKBitmap，失敗時回傳 null</returns>
     public SKBitmap? DecodeBitmap(string filePath)
     {
         try
@@ -33,257 +42,142 @@ public class ImageDecoderService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to decode image {filePath}: {ex.Message}");
+            Console.WriteLine($"[Decode] 解碼失敗 {Path.GetFileName(filePath)}: {ex.Message}");
             return null;
         }
     }
 
-    private SKBitmap? DecodeRaw(string filePath)
-    {
-        // 策略 1: 使用 LibRaw 完整解碼
-        var bitmap = _libRawDecoder.DecodeFull(filePath);
-        if (bitmap != null)
-        {
-            return bitmap;
-        }
-
-        // 策略 2: 嘗試半尺寸解碼
-        bitmap = _libRawDecoder.DecodeHalfSize(filePath);
-        if (bitmap != null)
-        {
-            Console.WriteLine($"[RAW] 使用半尺寸解碼: {Path.GetFileName(filePath)}");
-            return bitmap;
-        }
-
-        Console.WriteLine($"[RAW] 無法解碼 RAW 檔案: {Path.GetFileName(filePath)}");
-        return null;
-    }
-
     /// <summary>
-    /// 嘗試提取 RAW 檔案的內嵌縮圖（使用 MetadataExtractor）
+    /// 非同步解碼完整圖片
     /// </summary>
-    private SKBitmap? ExtractRawEmbeddedThumbnail(string filePath, int maxSize)
+    public Task<SKBitmap?> DecodeBitmapAsync(string filePath, CancellationToken ct = default)
     {
-        try
-        {
-            var directories = MetadataExtractor.ImageMetadataReader.ReadMetadata(filePath);
-
-            foreach (var directory in directories)
-            {
-                var dirName = directory.Name.ToLower();
-                if (!dirName.Contains("thumbnail") && !dirName.Contains("preview") && !dirName.Contains("jpeg"))
-                    continue;
-
-                foreach (var tag in directory.Tags)
-                {
-                    var tagName = tag.Name?.ToLower() ?? "";
-                    var tagDesc = tag.Description?.ToLower() ?? "";
-
-                    if (tagName.Contains("thumbnail") || tagName.Contains("preview") ||
-                        tagName.Contains("jpeginterchangeformat") || tagDesc.Contains("bytes"))
-                    {
-                        try
-                        {
-                            var obj = directory.GetObject(tag.Type);
-                            if (obj is byte[] thumbnailData && thumbnailData.Length > 1000)
-                            {
-                                if (thumbnailData.Length > 2 &&
-                                    thumbnailData[0] == 0xFF && thumbnailData[1] == 0xD8)
-                                {
-                                    using var thumbnailStream = new MemoryStream(thumbnailData);
-                                    var thumbnail = SKBitmap.Decode(thumbnailStream);
-
-                                    if (thumbnail != null && thumbnail.Width > 50 && thumbnail.Height > 50)
-                                    {
-                                        Console.WriteLine($"[RAW] 成功提取內嵌縮圖: {thumbnail.Width}x{thumbnail.Height}");
-
-                                        if (thumbnail.Width > maxSize || thumbnail.Height > maxSize)
-                                        {
-                                            var scale = Math.Min((float)maxSize / thumbnail.Width, (float)maxSize / thumbnail.Height);
-                                            var targetWidth = (int)(thumbnail.Width * scale);
-                                            var targetHeight = (int)(thumbnail.Height * scale);
-                                            var samplingOptions = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Nearest);
-                                            var resized = thumbnail.Resize(new SKImageInfo(targetWidth, targetHeight), samplingOptions);
-                                            thumbnail.Dispose();
-                                            return resized;
-                                        }
-                                        return thumbnail;
-                                    }
-                                    thumbnail?.Dispose();
-                                }
-                            }
-                        }
-                        catch { }
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[RAW] MetadataExtractor 提取失敗: {ex.Message}");
-        }
-
-        return null;
+        return Task.Run(() => DecodeBitmap(filePath), ct);
     }
+
+    #endregion
+
+    #region Public Methods - Thumbnail Decoding
 
     /// <summary>
     /// 解碼縮圖
     /// </summary>
+    /// <param name="filePath">圖片檔案路徑</param>
+    /// <param name="maxSize">縮圖最大尺寸</param>
+    /// <returns>解碼後的縮圖 SKBitmap，失敗時回傳 null</returns>
     public SKBitmap? DecodeThumbnail(string filePath, int maxSize = 128)
     {
         if (ImageUtils.IsRawFile(filePath))
         {
-            // 策略 1: LibRaw 提取內嵌縮圖（最快）
-            var librawThumbnail = _libRawDecoder.ExtractThumbnail(filePath, maxSize);
-            if (librawThumbnail != null)
-            {
-                return librawThumbnail;
-            }
-
-            // 策略 2: LibRaw 半尺寸解碼
-            var librawHalfSize = _libRawDecoder.DecodeHalfSize(filePath);
-            if (librawHalfSize != null)
-            {
-                if (librawHalfSize.Width > maxSize || librawHalfSize.Height > maxSize)
-                {
-                    var scale = Math.Min((float)maxSize / librawHalfSize.Width, (float)maxSize / librawHalfSize.Height);
-                    var targetWidth = (int)(librawHalfSize.Width * scale);
-                    var targetHeight = (int)(librawHalfSize.Height * scale);
-                    var samplingOptions = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Nearest);
-                    var resized = librawHalfSize.Resize(new SKImageInfo(targetWidth, targetHeight), samplingOptions);
-                    librawHalfSize.Dispose();
-                    return resized;
-                }
-                return librawHalfSize;
-            }
-
-            // 策略 3: MetadataExtractor 提取內嵌縮圖
-            var embeddedThumbnail = ExtractRawEmbeddedThumbnail(filePath, maxSize);
-            if (embeddedThumbnail != null)
-            {
-                return embeddedThumbnail;
-            }
-
-            Console.WriteLine($"[RAW] 無法解碼縮圖: {Path.GetFileName(filePath)}");
-            return null;
+            return DecodeRawThumbnail(filePath, maxSize);
         }
 
+        return DecodeStandardThumbnail(filePath, maxSize);
+    }
+
+    /// <summary>
+    /// 非同步解碼縮圖
+    /// </summary>
+    public Task<SKBitmap?> DecodeThumbnailAsync(string filePath, int maxSize = 128, CancellationToken ct = default)
+    {
+        return Task.Run(() => DecodeThumbnail(filePath, maxSize), ct);
+    }
+
+    #endregion
+
+    #region Public Methods - GIF Animation
+
+    /// <summary>
+    /// 解碼 GIF 動畫
+    /// </summary>
+    /// <param name="filePath">GIF 檔案路徑</param>
+    /// <returns>包含所有影格的 AnimatedImage，失敗時回傳 null</returns>
+    public AnimatedImage? DecodeGif(string filePath)
+    {
         try
         {
             using var stream = File.OpenRead(filePath);
             using var codec = SKCodec.Create(stream);
 
-            if (codec == null)
+            if (codec == null || codec.FrameCount <= 1)
                 return null;
 
+            var animatedImage = new AnimatedImage();
             var info = codec.Info;
-            float scale = Math.Min((float)maxSize / info.Width, (float)maxSize / info.Height);
 
-            if (scale >= 1.0f)
+            for (int i = 0; i < codec.FrameCount; i++)
             {
+                var duration = codec.FrameInfo[i].Duration;
+                if (duration < 10) duration = 100; // 最小 10ms，預設 100ms
+
                 var bitmap = new SKBitmap(info);
-                var result = codec.GetPixels(info, bitmap.GetPixels());
-                if (result == SKCodecResult.Success || result == SKCodecResult.IncompleteInput)
-                    return bitmap;
-                return null;
+                var options = new SKCodecOptions(i);
+
+                codec.GetPixels(info, bitmap.GetPixels(), options);
+                animatedImage.AddFrame(bitmap, duration);
             }
 
-            var targetInfo = new SKImageInfo((int)(info.Width * scale), (int)(info.Height * scale));
-            var scaledBitmap = new SKBitmap(targetInfo);
-            var scaledResult = codec.GetPixels(targetInfo, scaledBitmap.GetPixels());
-
-            if (scaledResult == SKCodecResult.Success || scaledResult == SKCodecResult.IncompleteInput)
-            {
-                return scaledBitmap;
-            }
-
-            throw new NotSupportedException("Scaling not supported for this codec");
+            return animatedImage;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            try
-            {
-                using var original = DecodeBitmap(filePath);
-                if (original == null)
-                    return null;
-
-                var scale = Math.Min((float)maxSize / original.Width, (float)maxSize / original.Height);
-                var targetWidth = (int)(original.Width * scale);
-                var targetHeight = (int)(original.Height * scale);
-
-                var samplingOptions = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Nearest);
-                return original.Resize(new SKImageInfo(targetWidth, targetHeight), samplingOptions);
-            }
-            catch (Exception ex2)
-            {
-                Console.WriteLine($"Fallback decode failed for {filePath}: {ex2.Message}");
-                return null;
-            }
+            Console.WriteLine($"[GIF] 解碼失敗 {Path.GetFileName(filePath)}: {ex.Message}");
+            return null;
         }
     }
 
+    #endregion
+
+    #region Public Methods - Image Info
+
     /// <summary>
-    /// 取得圖片尺寸
+    /// 取得圖片尺寸（不載入完整圖片）
     /// </summary>
     public (int Width, int Height)? GetImageDimensions(string filePath)
     {
         if (ImageUtils.IsRawFile(filePath))
         {
-            try
-            {
-                var thumbnail = _libRawDecoder.ExtractThumbnail(filePath, 256);
-                if (thumbnail != null)
-                {
-                    var dims = (thumbnail.Width, thumbnail.Height);
-                    thumbnail.Dispose();
-                    return dims;
-                }
-            }
-            catch { }
-
-            try
-            {
-                var bitmap = _libRawDecoder.DecodeHalfSize(filePath);
-                if (bitmap != null)
-                {
-                    var dims = (bitmap.Width * 2, bitmap.Height * 2);
-                    bitmap.Dispose();
-                    return dims;
-                }
-            }
-            catch
-            {
-                return null;
-            }
+            return GetRawDimensions(filePath);
         }
 
-        try
-        {
-            using var stream = File.OpenRead(filePath);
-            using var codec = SKCodec.Create(stream);
+        return GetStandardDimensions(filePath);
+    }
 
-            if (codec == null)
-                return null;
+    #endregion
 
-            return (codec.Info.Width, codec.Info.Height);
-        }
-        catch
-        {
-            return null;
-        }
+    #region Public Methods - EXIF (委派給 ExifService)
+
+    /// <summary>
+    /// 讀取結構化的 EXIF 資訊
+    /// </summary>
+    public ExifInfo GetExifInfo(string filePath)
+    {
+        return _exifService.GetExifInfo(filePath);
     }
 
     /// <summary>
-    /// 儲存圖片為 WebP 格式
+    /// 讀取完整 EXIF 資訊
+    /// </summary>
+    public Dictionary<string, string> GetExifData(string filePath)
+    {
+        return _exifService.GetExifData(filePath);
+    }
+
+    #endregion
+
+    #region Public Methods - Image Saving
+
+    /// <summary>
+    /// 儲存圖片為 WebP 格式到檔案
     /// </summary>
     public bool SaveAsWebP(SKBitmap bitmap, string outputPath, int quality = 85)
     {
         try
         {
             var directory = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(directory) && !System.IO.Directory.Exists(directory))
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
-                System.IO.Directory.CreateDirectory(directory);
+                Directory.CreateDirectory(directory);
             }
 
             using var fileStream = File.Create(outputPath);
@@ -291,7 +185,7 @@ public class ImageDecoderService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to save WebP {outputPath}: {ex.Message}");
+            Console.WriteLine($"[Save] WebP 儲存失敗 {outputPath}: {ex.Message}");
             return false;
         }
     }
@@ -311,183 +205,277 @@ public class ImageDecoderService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to save WebP to stream: {ex.Message}");
+            Console.WriteLine($"[Save] WebP 串流儲存失敗: {ex.Message}");
             return false;
         }
     }
 
+    #endregion
+
+    #region Private Methods - RAW Decoding
+
     /// <summary>
-    /// 非同步解碼完整圖片
+    /// 解碼 RAW 檔案（完整解析度）
     /// </summary>
-    public Task<SKBitmap?> DecodeBitmapAsync(string filePath, CancellationToken ct = default)
+    private SKBitmap? DecodeRaw(string filePath)
     {
-        return Task.Run(() => DecodeBitmap(filePath), ct);
+        // 策略 1: LibRaw 完整解碼
+        var bitmap = _libRawDecoder.DecodeFull(filePath);
+        if (bitmap != null) return bitmap;
+
+        // 策略 2: LibRaw 半尺寸解碼（回退）
+        bitmap = _libRawDecoder.DecodeHalfSize(filePath);
+        if (bitmap != null)
+        {
+            Console.WriteLine($"[RAW] 使用半尺寸解碼: {Path.GetFileName(filePath)}");
+            return bitmap;
+        }
+
+        Console.WriteLine($"[RAW] 無法解碼: {Path.GetFileName(filePath)}");
+        return null;
     }
 
     /// <summary>
-    /// 非同步解碼縮圖
+    /// 解碼 RAW 縮圖
     /// </summary>
-    public Task<SKBitmap?> DecodeThumbnailAsync(string filePath, int maxSize = 128, CancellationToken ct = default)
+    private SKBitmap? DecodeRawThumbnail(string filePath, int maxSize)
     {
-        return Task.Run(() => DecodeThumbnail(filePath, maxSize), ct);
+        // 策略 1: LibRaw 提取內嵌縮圖（最快）
+        var thumbnail = _libRawDecoder.ExtractThumbnail(filePath, maxSize);
+        if (thumbnail != null) return thumbnail;
+
+        // 策略 2: LibRaw 半尺寸解碼
+        var halfSize = _libRawDecoder.DecodeHalfSize(filePath);
+        if (halfSize != null)
+        {
+            return ResizeBitmapIfNeeded(halfSize, maxSize);
+        }
+
+        // 策略 3: MetadataExtractor 提取內嵌縮圖
+        var embedded = ExtractEmbeddedThumbnail(filePath, maxSize);
+        if (embedded != null) return embedded;
+
+        Console.WriteLine($"[RAW] 無法解碼縮圖: {Path.GetFileName(filePath)}");
+        return null;
     }
 
+    #endregion
+
+    #region Private Methods - Standard Image Decoding
+
     /// <summary>
-    /// 解碼 GIF 動畫
+    /// 解碼標準格式縮圖（JPG、PNG 等）
     /// </summary>
-    public AnimatedImage? DecodeGif(string filePath)
+    private SKBitmap? DecodeStandardThumbnail(string filePath, int maxSize)
     {
         try
         {
             using var stream = File.OpenRead(filePath);
             using var codec = SKCodec.Create(stream);
 
-            if (codec == null || codec.FrameCount <= 1)
-                return null;
+            if (codec == null) return null;
 
-            var animatedImage = new AnimatedImage();
             var info = codec.Info;
+            float scale = Math.Min((float)maxSize / info.Width, (float)maxSize / info.Height);
 
-            for (int i = 0; i < codec.FrameCount; i++)
+            // 圖片小於縮圖尺寸，直接解碼
+            if (scale >= 1.0f)
             {
-                var duration = codec.FrameInfo[i].Duration;
-                if (duration < 10) duration = 100;
-
                 var bitmap = new SKBitmap(info);
-                var options = new SKCodecOptions(i);
-
-                codec.GetPixels(info, bitmap.GetPixels(), options);
-                animatedImage.AddFrame(bitmap, duration);
+                var result = codec.GetPixels(info, bitmap.GetPixels());
+                return (result == SKCodecResult.Success || result == SKCodecResult.IncompleteInput) ? bitmap : null;
             }
 
-            return animatedImage;
+            // 縮放解碼
+            var targetInfo = new SKImageInfo((int)(info.Width * scale), (int)(info.Height * scale));
+            var scaledBitmap = new SKBitmap(targetInfo);
+            var scaledResult = codec.GetPixels(targetInfo, scaledBitmap.GetPixels());
+
+            if (scaledResult == SKCodecResult.Success || scaledResult == SKCodecResult.IncompleteInput)
+            {
+                return scaledBitmap;
+            }
+
+            throw new NotSupportedException("縮放解碼不支援此格式");
+        }
+        catch
+        {
+            // 回退：先載入完整圖片再縮放
+            return DecodeAndResizeFallback(filePath, maxSize);
+        }
+    }
+
+    /// <summary>
+    /// 回退解碼：先載入完整圖片再縮放
+    /// </summary>
+    private SKBitmap? DecodeAndResizeFallback(string filePath, int maxSize)
+    {
+        try
+        {
+            using var original = DecodeBitmap(filePath);
+            if (original == null) return null;
+
+            return ResizeBitmapIfNeeded(original, maxSize);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to decode GIF {filePath}: {ex.Message}");
+            Console.WriteLine($"[Decode] 回退解碼失敗 {Path.GetFileName(filePath)}: {ex.Message}");
             return null;
         }
     }
 
-    /// <summary>
-    /// 讀取結構化的 EXIF 資訊
-    /// </summary>
-    public ExifInfo GetExifInfo(string filePath)
-    {
-        var info = new ExifInfo();
+    #endregion
 
+    #region Private Methods - Image Dimensions
+
+    /// <summary>
+    /// 取得 RAW 圖片尺寸
+    /// </summary>
+    private (int Width, int Height)? GetRawDimensions(string filePath)
+    {
+        // 嘗試從縮圖取得尺寸
         try
         {
-            var directories = MetadataExtractor.ImageMetadataReader.ReadMetadata(filePath);
-
-            var ifd0 = directories.OfType<ExifIfd0Directory>().FirstOrDefault();
-            if (ifd0 != null)
+            var thumbnail = _libRawDecoder.ExtractThumbnail(filePath, 256);
+            if (thumbnail != null)
             {
-                info.Make = ifd0.GetString(ExifIfd0Directory.TagMake) ?? "";
-                info.Model = ifd0.GetString(ExifIfd0Directory.TagModel) ?? "";
-            }
-
-            var subIfd = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
-            if (subIfd != null)
-            {
-                info.Lens = subIfd.GetString(ExifSubIfdDirectory.TagLensModel) ?? "";
-                
-                if (subIfd.ContainsTag(ExifSubIfdDirectory.TagFNumber))
-                {
-                    double fNumber = subIfd.GetDouble(ExifSubIfdDirectory.TagFNumber);
-                    info.FNumber = $"f/{fNumber:0.0}";
-                }
-
-                if (subIfd.ContainsTag(ExifSubIfdDirectory.TagExposureTime))
-                {
-                    double exposureTime = subIfd.GetDouble(ExifSubIfdDirectory.TagExposureTime);
-                    info.ExposureTime = exposureTime < 1.0 
-                        ? $"1/{Math.Round(1.0 / exposureTime)}" 
-                        : $"{exposureTime}s";
-                }
-
-                string? iso = subIfd.GetString(ExifSubIfdDirectory.TagIsoEquivalent);
-                if (string.IsNullOrEmpty(iso))
-                {
-                     if (subIfd.ContainsTag(0x8833))
-                        iso = subIfd.GetString(0x8833);
-                }
-                
-                if (!string.IsNullOrEmpty(iso)) info.Iso = $"ISO {iso}";
-
-                if (subIfd.ContainsTag(ExifSubIfdDirectory.TagFocalLength))
-                {
-                    double focalLength = subIfd.GetDouble(ExifSubIfdDirectory.TagFocalLength);
-                    info.FocalLength = $"{focalLength}mm";
-                }
-
-                if (subIfd.ContainsTag(ExifSubIfdDirectory.TagDateTimeOriginal))
-                {
-                    try 
-                    {
-                        info.DateTaken = subIfd.GetDateTime(ExifSubIfdDirectory.TagDateTimeOriginal);
-                    }
-                    catch {}
-                }
+                var dims = (thumbnail.Width, thumbnail.Height);
+                thumbnail.Dispose();
+                return dims;
             }
         }
-        catch (Exception ex)
+        catch { }
+
+        // 嘗試從半尺寸解碼估計
+        try
         {
-            Console.WriteLine($"Error reading structured EXIF: {ex.Message}");
+            var halfSize = _libRawDecoder.DecodeHalfSize(filePath);
+            if (halfSize != null)
+            {
+                var dims = (halfSize.Width * 2, halfSize.Height * 2);
+                halfSize.Dispose();
+                return dims;
+            }
         }
+        catch { }
 
-        return info;
+        return null;
     }
 
     /// <summary>
-    /// 讀取完整 EXIF 資訊
+    /// 取得標準格式圖片尺寸
     /// </summary>
-    public Dictionary<string, string> GetExifData(string filePath)
+    private (int Width, int Height)? GetStandardDimensions(string filePath)
     {
-        var exifData = new Dictionary<string, string>();
+        try
+        {
+            using var stream = File.OpenRead(filePath);
+            using var codec = SKCodec.Create(stream);
 
+            return codec != null ? (codec.Info.Width, codec.Info.Height) : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #endregion
+
+    #region Private Methods - Thumbnail Extraction
+
+    /// <summary>
+    /// 使用 MetadataExtractor 提取內嵌縮圖
+    /// </summary>
+    private SKBitmap? ExtractEmbeddedThumbnail(string filePath, int maxSize)
+    {
         try
         {
             var directories = MetadataExtractor.ImageMetadataReader.ReadMetadata(filePath);
 
             foreach (var directory in directories)
             {
+                var dirName = directory.Name.ToLower();
+                if (!dirName.Contains("thumbnail") && !dirName.Contains("preview") && !dirName.Contains("jpeg"))
+                    continue;
+
                 foreach (var tag in directory.Tags)
                 {
-                    var key = $"{directory.Name} - {tag.Name}";
-                    
-                    if (!exifData.ContainsKey(key))
+                    var tagName = tag.Name?.ToLower() ?? "";
+                    var tagDesc = tag.Description?.ToLower() ?? "";
+
+                    if (tagName.Contains("thumbnail") || tagName.Contains("preview") ||
+                        tagName.Contains("jpeginterchangeformat") || tagDesc.Contains("bytes"))
                     {
-                        exifData[key] = tag.Description ?? "";
+                        var thumbnail = TryExtractThumbnailFromTag(directory, tag, maxSize);
+                        if (thumbnail != null) return thumbnail;
                     }
                 }
             }
-
-            var fileInfo = new FileInfo(filePath);
-            if (!exifData.ContainsKey("File - Name"))
-                exifData["File - Name"] = fileInfo.Name;
-            
-            if (!exifData.ContainsKey("File - Size"))
-                exifData["File - Size"] = $"{fileInfo.Length / 1024.0:F2} KB";
-            
-            if (!exifData.ContainsKey("File - Created"))
-                exifData["File - Created"] = fileInfo.CreationTime.ToString("yyyy-MM-dd HH:mm:ss");
-            
-            if (!exifData.ContainsKey("File - Modified"))
-                exifData["File - Modified"] = fileInfo.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to read EXIF {filePath}: {ex.Message}");
-            try
-            {
-                var fileInfo = new FileInfo(filePath);
-                exifData["File - Name"] = fileInfo.Name;
-                exifData["File - Size"] = $"{fileInfo.Length / 1024.0:F2} KB";
-            }
-            catch { }
+            Console.WriteLine($"[Thumbnail] MetadataExtractor 提取失敗: {ex.Message}");
         }
 
-        return exifData;
+        return null;
     }
+
+    /// <summary>
+    /// 嘗試從特定標籤提取縮圖
+    /// </summary>
+    private SKBitmap? TryExtractThumbnailFromTag(MetadataExtractor.Directory directory, MetadataExtractor.Tag tag, int maxSize)
+    {
+        try
+        {
+            var obj = directory.GetObject(tag.Type);
+            if (obj is not byte[] thumbnailData || thumbnailData.Length <= 1000)
+                return null;
+
+            // 驗證 JPEG 簽名
+            if (thumbnailData[0] != 0xFF || thumbnailData[1] != 0xD8)
+                return null;
+
+            using var stream = new MemoryStream(thumbnailData);
+            var thumbnail = SKBitmap.Decode(stream);
+
+            if (thumbnail == null || thumbnail.Width <= 50 || thumbnail.Height <= 50)
+            {
+                thumbnail?.Dispose();
+                return null;
+            }
+
+            Console.WriteLine($"[Thumbnail] 成功提取內嵌縮圖: {thumbnail.Width}x{thumbnail.Height}");
+            return ResizeBitmapIfNeeded(thumbnail, maxSize);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #endregion
+
+    #region Private Methods - Image Utilities
+
+    /// <summary>
+    /// 如果圖片超過指定大小則縮放
+    /// </summary>
+    private SKBitmap? ResizeBitmapIfNeeded(SKBitmap bitmap, int maxSize)
+    {
+        if (bitmap.Width <= maxSize && bitmap.Height <= maxSize)
+            return bitmap;
+
+        var scale = Math.Min((float)maxSize / bitmap.Width, (float)maxSize / bitmap.Height);
+        var targetWidth = (int)(bitmap.Width * scale);
+        var targetHeight = (int)(bitmap.Height * scale);
+
+        var samplingOptions = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Nearest);
+        var resized = bitmap.Resize(new SKImageInfo(targetWidth, targetHeight), samplingOptions);
+
+        bitmap.Dispose();
+        return resized;
+    }
+
+    #endregion
 }
