@@ -236,10 +236,25 @@
                                 <Setter Property="Padding" Value="2"/>
                                 <Setter Property="BorderThickness" Value="0,0,0,1"/>
                                 <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}"/>
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
                                         <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
                                     </Trigger>
+                                    <!-- 選中狀態 - 高對比度 -->
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                    </Trigger>
+                                    <!-- 選中且無焦點 -->
+                                    <MultiTrigger>
+                                        <MultiTrigger.Conditions>
+                                            <Condition Property="IsSelected" Value="True"/>
+                                            <Condition Property="Selector.IsSelectionActive" Value="False"/>
+                                        </MultiTrigger.Conditions>
+                                        <Setter Property="Background" Value="#FF3A4A5A"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                    </MultiTrigger>
                                 </Style.Triggers>
                             </Style>
                             <Style TargetType="GridViewColumnHeader">
