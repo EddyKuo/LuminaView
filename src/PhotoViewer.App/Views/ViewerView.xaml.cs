@@ -271,6 +271,13 @@ public partial class ViewerView : Window
         {
             InfoPanel.Visibility = Visibility.Visible;
         }
+
+        // 延遲執行，等待佈局更新後再自適應視窗
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            ImageCanvas.FitToWindow();
+            UpdateZoomDisplay();
+        }), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     // 幻燈片播放相關
