@@ -22,6 +22,10 @@ public class SkiaCanvasControl : SKElement
     private bool _isDragging;
     private Point _lastMousePosition;
 
+    // 繪製表面的實際像素尺寸（用於正確置中）
+    private int _surfaceWidth;
+    private int _surfaceHeight;
+
     public SkiaCanvasControl()
     {
         MouseWheel += OnMouseWheel;
@@ -169,6 +173,22 @@ public class SkiaCanvasControl : SKElement
         var canvas = e.Surface.Canvas;
         canvas.Clear(SKColors.Black);
 
+        // 更新表面尺寸（像素）
+        if (_surfaceWidth != e.Info.Width || _surfaceHeight != e.Info.Height)
+        {
+            _surfaceWidth = e.Info.Width;
+            _surfaceHeight = e.Info.Height;
+
+            // 如果有待置中的圖片，重新計算
+            if (_currentBitmap != null && _needsCentering)
+            {
+                _needsCentering = false;
+                _scale = CalculateFitScale();
+                _translate = CalculateCenterPosition();
+                UpdateMatrix();
+            }
+        }
+
         if (_currentBitmap == null)
         {
             DrawPlaceholder(canvas, e.Info.Width, e.Info.Height);
@@ -229,11 +249,12 @@ public class SkiaCanvasControl : SKElement
     /// </summary>
     private float CalculateFitScale()
     {
-        if (_currentBitmap == null || ActualWidth == 0 || ActualHeight == 0)
+        if (_currentBitmap == null || _surfaceWidth == 0 || _surfaceHeight == 0)
             return 1.0f;
 
-        var scaleX = (float)ActualWidth / _currentBitmap.Width;
-        var scaleY = (float)ActualHeight / _currentBitmap.Height;
+        // 使用像素尺寸計算縮放比例
+        var scaleX = (float)_surfaceWidth / _currentBitmap.Width;
+        var scaleY = (float)_surfaceHeight / _currentBitmap.Height;
 
         return Math.Min(scaleX, scaleY) * 0.95f; // 留 5% 邊距
     }
@@ -246,10 +267,11 @@ public class SkiaCanvasControl : SKElement
     /// </summary>
     private SKPoint CalculateCenterPosition()
     {
-        if (ActualWidth == 0 || ActualHeight == 0)
+        if (_surfaceWidth == 0 || _surfaceHeight == 0)
             return SKPoint.Empty;
 
-        return new SKPoint((float)ActualWidth / 2f, (float)ActualHeight / 2f);
+        // 使用像素尺寸計算中心點
+        return new SKPoint(_surfaceWidth / 2f, _surfaceHeight / 2f);
     }
 
     /// <summary>
