@@ -542,17 +542,9 @@ public partial class MainWindow : Window
             {
                 if (element.DataContext is ImageItem item)
                 {
-                    // 更新評分
+                    // 更新評分 (ImageItem 現在實作 INotifyPropertyChanged，UI 會自動更新)
                     item.Rating = rating;
                     _ratingService.SetRating(item.FilePath, rating);
-
-                    // 強制刷新 UI
-                    var index = FilteredImages.IndexOf(item);
-                    if (index >= 0)
-                    {
-                        FilteredImages.RemoveAt(index);
-                        FilteredImages.Insert(index, item);
-                    }
 
                     StatusTextBlock.Text = rating > 0 
                         ? $"已設定 {item.FileName} 為 {rating} 星評分" 

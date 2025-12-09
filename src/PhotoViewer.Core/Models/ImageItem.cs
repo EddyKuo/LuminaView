@@ -1,10 +1,16 @@
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
 namespace PhotoViewer.Core.Models;
 
 /// <summary>
 /// 圖片項目資料模型
+/// 實作 INotifyPropertyChanged 以支援 UI 資料繫結更新
 /// </summary>
-public class ImageItem
+public class ImageItem : INotifyPropertyChanged
 {
+    private int _rating = 0;
+
     /// <summary>
     /// 檔案完整路徑
     /// </summary>
@@ -68,6 +74,29 @@ public class ImageItem
 
     /// <summary>
     /// 圖片評分 (0-5 星, 0 表示未評分)
+    /// 使用 PropertyChanged 通知 UI 更新
     /// </summary>
-    public int Rating { get; set; } = 0;
+    public int Rating
+    {
+        get => _rating;
+        set
+        {
+            if (_rating != value)
+            {
+                _rating = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    #region INotifyPropertyChanged
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    #endregion
 }
